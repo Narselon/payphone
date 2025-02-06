@@ -1,28 +1,23 @@
+import yaml
 from scene import Scene
 
-# Your scenes dictionary
-scenes = {
-    "intro": Scene(
-        id="intro",
-        text="You wake up in a dark room.\n1. Jump in the pit.\n2. Call your uncle",
-        connections=["scene1", "scene2"],
-    ),
-    "scene1": Scene(
-        id="scene1",
-        text="You fall in a pit.\n1. Call for help",
-        connections=["scene3"],
-    ),
-    "scene2": Scene(
-        id="scene2",
-        text="You try to call your uncle.\n1. You take out your phone and it slips out of your hand. In an effort to catch it, you fall into a pit.",
-        connections=["scene3"],
-    ),
-    "scene3": Scene(
-        id="scene3",
-        text="You find your uncle in the pit.\n1. Restart",
-        connections=["intro"],  # Loop back to the intro
-    ),
-}
+# Load scenes from a YAML file
+def load_scenes(filename: str) -> dict:
+    with open(filename, "r", encoding="utf-8") as file:
+        data = yaml.safe_load(file)
+    
+    scenes = {}
+    for scene_id, scene_data in data["scenes"].items():
+        scenes[scene_id] = Scene(
+            id=scene_data["id"],
+            text=scene_data["text"],
+            connections=scene_data["connections"]
+        )
+    
+    return scenes
+
+# Load the scenes dynamically
+scenes = load_scenes("story.yaml")
 
 
 def explore(scene_id: str) -> str:
