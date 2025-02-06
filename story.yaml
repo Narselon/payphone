@@ -1,0 +1,17 @@
+scenes:
+  intro:
+    id: "intro"
+    text: "You wake up in a dark room.\n1. Jump in the pit.\n2. Call your uncle"
+    connections: ["scene1", "scene2"]
+  scene1:
+    id: "scene1"
+    text: "You fall in a pit.\n1. Call for help"
+    connections: ["scene3"]
+  scene2:
+    id: "scene2"
+    text: "You try to call your uncle.\n1. You take out your phone and it slips out of your hand. In an effort to catch it, you fall into a pit."
+    connections: ["scene3"]
+  scene3:
+    id: "scene3"
+    text: "You find your uncle in the pit.\n1. Restart"
+    connections: ["intro"]
