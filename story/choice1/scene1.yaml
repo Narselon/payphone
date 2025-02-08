@@ -1,0 +1,3 @@
+id: "scene1"
+text: "You fall in a pit.\n1. Call for help"
+connections: ["scene3"]

@@ -1,23 +1,29 @@
 import yaml
+import os
 from scene import Scene
 
-# Load scenes from a YAML file
-def load_scenes(filename: str) -> dict:
-    with open(filename, "r", encoding="utf-8") as file:
-        data = yaml.safe_load(file)
-    
+SCENE_DIR = "story"  # Root directory for scene files
+
+def load_scenes(scene_dir: str) -> dict:
     scenes = {}
-    for scene_id, scene_data in data["scenes"].items():
-        scenes[scene_id] = Scene(
-            id=scene_data["id"],
-            text=scene_data["text"],
-            connections=scene_data["connections"]
-        )
-    
+
+    # Walk through all subdirectories
+    for root, _, files in os.walk(scene_dir):
+        for filename in files:
+            if filename.endswith(".yaml"):  # Process only YAML files
+                filepath = os.path.join(root, filename)
+                with open(filepath, "r", encoding="utf-8") as file:
+                    scene_data = yaml.safe_load(file)
+                    scenes[scene_data["id"]] = Scene(
+                        id=scene_data["id"],
+                        text=scene_data["text"],
+                        connections=scene_data["connections"]
+                    )
+
     return scenes
 
-# Load the scenes dynamically
-scenes = load_scenes("story.yaml")
+# Load scenes dynamically from the hierarchical structure
+scenes = load_scenes(SCENE_DIR)
 
 
 def explore(scene_id: str) -> str:
