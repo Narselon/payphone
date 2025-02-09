@@ -1,3 +1,6 @@
 id: "intro"
 text: "You wake up in a dark room.\n1. Jump in the pit.\n2. Call your uncle"
 connections: ["scene1", "scene2"]
+hidden_options:
+  "042": "secret_scene"
+  "skip": "scene3"
