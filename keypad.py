@@ -116,7 +116,7 @@ def wait_for_keypress(buffer=None):
 def is_phone_lifted():
     """Returns True if the phone is off the hook."""
     if GPIO_AVAILABLE:
-        return GPIO.input(SWITCH_PIN) == GPIO.HIGH
+        return GPIO.input(SWITCH_PIN) == GPIO.LOW
     else:
         return True  # Assume phone is lifted for PC testing
 
