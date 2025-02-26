@@ -1,6 +1,10 @@
 id: "intro"
-text: "You wake up in a dark room.\n1. Jump in the pit.\n2. Call your uncle"
-connections: ["scene1", "scene2"]
-hidden_options:
+text: "You wake up in a dark room. The phone in your hand is your only connection to the outside world.\n1. Jump in the pit.\n2. Call your uncle"
+connections:
+  1: ["Jump in the pit", "scene1", []]
+  2: ["Call your uncle", "scene2", ["phone_number"]]
+hidden_connections:
   "042": "secret_scene"
   "skip": "scene3"
+items_granted: ["flashlight"]
+items_required: []

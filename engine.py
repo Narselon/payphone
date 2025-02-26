@@ -1,85 +1,245 @@
-import yaml
 import os
-from scene import Scene
-#from keypad import wait_for_keypress, is_phone_lifted, wait_for_hook_change
+import yaml
+import keypad
+import time
 
-SCENE_DIR = "story"  # Root directory for scene files
+class Scene:
+    def __init__(self, id, text, connections, hidden_connections=None, items_granted=None, items_required=None):
+        self.id = id
+        self.text = text
+        self.connections = connections
+        self.hidden_connections = hidden_connections if hidden_connections else {}
+        self.items_granted = items_granted if items_granted else []
+        self.items_required = items_required if items_required else []
 
-def load_scenes(scene_dir: str) -> dict:
+    def display(self, inventory):
+        # Clear the screen first to avoid duplicate display
+        # print("\033[H\033[J", end="")  # This clears the screen on ANSI-compatible terminals
+        print("-" * 50)  
+        print(self.text)
+        
+        # Display inventory if it's not empty
+        if inventory:
+            print("\nInventory:", ", ".join(inventory))
+        
+        # We'll let the original code print the options
+        # This is commented out to avoid duplication
+        # for key, value in self.connections.items():
+        #     print(f"{key}. {value[0]}")
+
+    def get_next_scene(self, choice, inventory):
+        """
+        Determine the next scene based on choice and check item requirements.
+        Returns the next scene ID or None if the choice is invalid.
+        Also returns a message if inventory requirements aren't met.
+        """
+        # Check if the choice is a special hidden connection
+        if choice in self.hidden_connections:
+            return self.hidden_connections[choice], None
+
+        # Check if it's a regular numbered choice
+        try:
+            choice_index = int(choice)
+            if choice_index in self.connections:
+                # Get target scene and check required items
+                target_scene_id = self.connections[choice_index][1]  # [1] is the scene ID
+                required_items = self.connections[choice_index][2] if len(self.connections[choice_index]) > 2 else []
+                
+                # Special case for calling someone without a phone number
+                if target_scene_id == "scene2" and "phone_number" not in inventory:
+                    return "no_numbers_scene", None
+                
+                # Check if the player has all required items
+                if all(item in inventory for item in required_items):
+                    return target_scene_id, None
+                else:
+                    missing_items = [item for item in required_items if item not in inventory]
+                    message = f"You can't do that. You need these items: {', '.join(missing_items)}"
+                    return None, message
+        except ValueError:
+            pass  # Ignore non-integer choices (except for hidden ones)
+            
+        return None, "Invalid choice. Try again."
+
+
+def load_scenes():
+    """Loads scenes from YAML files in the 'story' directory and its subdirectories."""
     scenes = {}
-
-    # Walk through all subdirectories
-    for root, _, files in os.walk(scene_dir):
-        for filename in files:
-            if filename.endswith(".yaml"):  # Process only YAML files
-                filepath = os.path.join(root, filename)
-                with open(filepath, "r", encoding="utf-8") as file:
-                    scene_data = yaml.safe_load(file)
-
-                    # Handle hidden options (default to empty if not defined)
-                    hidden_options = scene_data.get("hidden_options", {})
-
-                    scenes[scene_data["id"]] = Scene(
-                        id=scene_data["id"],
-                        text=scene_data["text"],
-                        connections=scene_data["connections"]
-                    )
-                    setattr(scenes[scene_data["id"]], "hidden_options", hidden_options)
+    
+    # Debug: Check if the story directory exists
+    if not os.path.exists("story"):
+        print("ERROR: 'story' directory not found!")
+        story_dir = "story"
+        os.makedirs(story_dir, exist_ok=True)
+        print(f"Created directory: {story_dir}")
+        return scenes
+    
+    # Debug: List all files in story directory
+    print(f"Files in story directory: {os.listdir('story')}")
+    
+    # Function to process a YAML file
+    def process_yaml_file(filepath):
+        try:
+            with open(filepath, "r") as file:
+                data = yaml.safe_load(file)
+                
+                # Process connections: transform from dictionary to more structured format
+                formatted_connections = {}
+                
+                # Handle different connection formats
+                if isinstance(data["connections"], dict):
+                    for key, value in data["connections"].items():
+                        # If the value is a string, it's just a scene ID
+                        if isinstance(value, str):
+                            formatted_connections[int(key)] = [f"Go to {value}", value, []]
+                        # If it's a list/dict, it might contain more info
+                        elif isinstance(value, list) and len(value) >= 2:
+                            formatted_connections[int(key)] = [value[0], value[1], value[2] if len(value) > 2 else []]
+                elif isinstance(data["connections"], list):
+                    # Simple list format [scene1, scene2, ...]
+                    for i, scene_id in enumerate(data["connections"], 1):
+                        formatted_connections[i] = [f"Go to {scene_id}", scene_id, []]
+                
+                scenes[data["id"]] = Scene(
+                    id=data["id"],
+                    text=data["text"],
+                    connections=formatted_connections,
+                    hidden_connections=data.get("hidden_connections", {}),
+                    items_granted=data.get("items_granted", []),
+                    items_required=data.get("items_required", [])
+                )
+                print(f"Loaded scene: {data['id']} from {filepath}")
+        except Exception as e:
+            print(f"Error loading {filepath}: {e}")
+    
+    # Recursively walk through directories
+    for root, dirs, files in os.walk("story"):
+        for file in files:
+            if file.endswith(".yaml"):
+                filepath = os.path.join(root, file)
+                process_yaml_file(filepath)
+    
+    # Add custom scene for when player has no phone numbers
+    scenes["no_numbers_scene"] = Scene(
+        id="no_numbers_scene",
+        text="You look at your phone but there are no numbers saved in your contacts. You need to find a phone number first.",
+        connections={1: ["Go back", "intro", []]}
+    )
+    
     return scenes
 
-# Load scenes dynamically from the hierarchical structure
-scenes = load_scenes(SCENE_DIR)
 
+def main():
+    scenes = load_scenes()
+    print(f"DEBUG: Loaded scenes = {scenes.keys()}")
+    print("\nGame Controls:")
+    print("- Use number keys to select options")
+    print("- Press 'h' at any time to hang up the phone")
+    print("- Press '*' followed by a sequence and '#' to enter codes")
+    print("- Press '#' to view your inventory")
+    print("\n--- Press Enter to begin ---")
+    input()
+    
+    current_scene = "intro"  # Start scene
+    inventory = set()  # Player inventory
+    input_buffer = ""  # Buffer for multi-digit inputs
+    previous_scene = None  # Track previous scene for invalid choices
+    
+    print("Waiting for phone to be lifted...")
+    keypad.wait_for_hook_change(expected_state=True)  # Wait for off-hook
 
-def explore(scene_id: str) -> str:
-    """
-    Takes in a scene_id, plays the scene for the user, then returns
-    the scene_id of the choice they made.
-    """
-    scene = scenes.get(scene_id)
-    if scene is None:
-        print("Invalid scene ID:", scene_id)
-        return "intro"  # Prevent crashing
+    while True:
+        scene = scenes.get(current_scene)
+        if not scene:
+            print(f"Error: Scene '{current_scene}' not found! Resetting to intro.")
+            current_scene = "intro"
+            continue
 
-    print(scene.text)
-
-
-    is_valid = False
-    next_choice = "intro"
-    while not is_valid:
-        player_choice = input("Make your choice: ")
+        # Check if we can enter the scene based on required items
+        if not all(item in inventory for item in scene.items_required):
+            missing_items = [item for item in scene.items_required if item not in inventory]
+            print(f"You can't go there yet. You need: {', '.join(missing_items)}")
+            time.sleep(2)  # Give player time to read the message
+            
+            # Go back to the previous scene if possible, or intro if not
+            current_scene = previous_scene if previous_scene else "intro"
+            continue
         
-        # Check if input matches a hidden option (e.g., a secret code)
-        if hasattr(scene, "hidden_options") and player_choice in scene.hidden_options:
-            return scene.hidden_options[player_choice]
+        # Store the current scene as previous for backtracking if needed
+        previous_scene = current_scene
         
-        try:
-            int_choice = int(player_choice) - 1
-            if 0 <= int_choice < len(scene.connections):
-                is_valid = True
-                next_choice = scene.connections[int_choice]
+        # Display the scene - display is modified to avoid duplication
+        scene.display(inventory)
+        
+        # Grant items from the scene
+        for item in scene.items_granted:
+            if item not in inventory:
+                inventory.add(item)
+                print(f"You obtained: {item}!")
+        
+        # Get player input
+        choice = keypad.wait_for_keypress()
+        
+        # Check for hang-up command
+        if choice == 'h' or choice == 'H':
+            print("Phone hung up. Resetting game...")
+            current_scene = "intro"
+            inventory.clear()
+            input_buffer = ""
+            print("\n--- Press Enter to lift the phone again ---")
+            keypad.wait_for_hook_change(expected_state=True)
+            continue
+            
+        # Reset the game if phone is placed back on hook (physical switch)
+        if not keypad.is_phone_lifted():
+            print("Phone placed back. Resetting game...")
+            keypad.wait_for_hook_change(expected_state=True)  # Wait for next start
+            current_scene = "intro"
+            inventory.clear()
+            input_buffer = ""
+            continue
+            
+        # Handle special command for showing inventory
+        if choice == "#":
+            print("\nInventory:")
+            if inventory:
+                for item in inventory:
+                    print(f"- {item}")
             else:
-                print("That's not a valid choice. Try again.")
-        except ValueError:
-            print("Please enter a valid number.")
+                print("Empty")
+            print("\nPress any key to continue...")
+            keypad.wait_for_keypress()
+            
+            # Redisplay the scene without incrementing it
+            continue
+            
+        # Handle multi-digit input
+        if choice == "*":
+            # Allow for sequence input (for codes)
+            print("Enter sequence (press # when done):")
+            sequence = ""
+            while True:
+                digit = keypad.wait_for_keypress()
+                if digit == "#":
+                    break
+                elif digit in "0123456789":
+                    sequence += digit
+                    print(digit, end="", flush=True)
+            print()  # New line after sequence
+            choice = sequence
 
-    return next_choice
+        # Get next scene based on user choice
+        next_scene, message = scene.get_next_scene(choice, inventory)
 
-#game loop
-#for use before running on payphone
-next_scene = explore("intro")
-while True:
-    next_scene = explore(next_scene)
+        if next_scene:
+            current_scene = next_scene
+        elif message:
+            print(message)
+            time.sleep(1.5)  # Give player time to read
+        else:
+            print("Invalid choice. Try again.")
+            time.sleep(1)
 
-#code below for hook implementation
-#while True:
-#    print("Waiting for phone to be lifted to start the game...")
-#    wait_for_hook_change(True)  # Wait for the phone to be lifted
-#    print("Game started!")
-    
-#    next_scene = "intro"
-#    while is_phone_lifted():  # Keep playing while phone is lifted
-#        next_scene = explore(next_scene)
-    
-#    print("Phone placed back. Game over.")
-#    wait_for_hook_change(False)  # Wait for the phone to be placed back
+
+if __name__ == "__main__":
+    main()
