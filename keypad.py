@@ -40,6 +40,7 @@ if GPIO_AVAILABLE:
 keyboard_input = None
 input_ready = threading.Event()
 phone_on_hook = True  # Track the state of the phone hook
+hook_state_changed = threading.Event()
 
 def poll_gpio():
     """Checks for a key press on the physical keypad."""
@@ -51,6 +52,7 @@ def poll_gpio():
         for row_index, row in enumerate(ROWS):
             if GPIO.input(row) == GPIO.LOW:
                 GPIO.output(col, GPIO.HIGH)
+                time.sleep(0.2)  # Debounce
                 return KEYPAD_MAPPING[row_index][col_index]
         GPIO.output(col, GPIO.HIGH)
     return None
@@ -61,37 +63,49 @@ def keyboard_input_thread():
     keyboard_input = input("").strip()
     input_ready.set()
 
-def check_hook_state():
-    """Checks and updates the phone hook state, returns True if state changed."""
+def hook_monitoring_thread():
+    """Thread function to continuously monitor the hook state."""
     global phone_on_hook
     
     if not GPIO_AVAILABLE:
-        return False  # No state change in simulation mode
-    
-    # Phone lifted off the hook (switch pressed)
-    if GPIO.input(SWITCH_PIN) == GPIO.LOW and phone_on_hook:
-        print("Phone lifted off the hook")
-        phone_on_hook = False
-        return True
-    
-    # Phone placed back on the hook
-    elif GPIO.input(SWITCH_PIN) == GPIO.HIGH and not phone_on_hook:
-        print("Phone placed back on the hook")
-        phone_on_hook = True
-        return True
+        return
         
-    return False  # No state change
+    while True:
+        # Phone lifted off the hook (switch pressed)
+        if GPIO.input(SWITCH_PIN) == GPIO.LOW and phone_on_hook:
+            print("Phone lifted off the hook")
+            phone_on_hook = False
+            hook_state_changed.set()
+        
+        # Phone placed back on the hook
+        elif GPIO.input(SWITCH_PIN) == GPIO.HIGH and not phone_on_hook:
+            print("Phone placed back on the hook")
+            phone_on_hook = True
+            hook_state_changed.set()
+            
+        time.sleep(0.1)  # Small delay to prevent CPU hogging
+
+def start_hook_monitoring():
+    """Starts the hook monitoring thread."""
+    if GPIO_AVAILABLE:
+        hook_thread = threading.Thread(target=hook_monitoring_thread)
+        hook_thread.daemon = True
+        hook_thread.start()
 
 def is_phone_lifted():
     """Returns True if the phone is off the hook."""
     global phone_on_hook
     
     if GPIO_AVAILABLE:
-        # Update the state first to ensure accuracy
-        check_hook_state()
-        return not phone_on_hook
+        # Read directly from the GPIO pin for immediate status
+        return GPIO.input(SWITCH_PIN) == GPIO.LOW
     else:
-        return True  # Assume phone is lifted for PC testing
+        # For simulation, provide a way to toggle state with 'h' key
+        if keyboard_input and keyboard_input.lower() == 'h':
+            phone_on_hook = not phone_on_hook
+            print(f"Simulated phone {'lifted' if not phone_on_hook else 'placed back'}")
+            return not phone_on_hook
+        return not phone_on_hook  # Return the current simulated state
 
 def wait_for_keypress(buffer=None):
     """
@@ -101,27 +115,28 @@ def wait_for_keypress(buffer=None):
     Args:
         buffer: Optional string buffer for multi-digit inputs
     """
-    global keyboard_input
+    global keyboard_input, hook_state_changed, phone_on_hook
     
     if buffer:
         print(f"Current buffer: {buffer}")
     
+    # Reset the hook state change event
+    hook_state_changed.clear()
+    
     if GPIO_AVAILABLE:
         # Check if there's something in the buffer first
         if buffer:
-            result = buffer
-            return result
+            return buffer
             
-        # Poll the GPIO keypad
+        # Poll the GPIO keypad until key press or hook state change
         while True:
-            # Check hook state first
-            if check_hook_state() and not is_phone_lifted():
-                return None  # Return None if phone is hung up
+            # Check if the hook state has changed
+            if hook_state_changed.is_set() or not is_phone_lifted():
+                return None  # Return None immediately if hook state changed or phone is on hook
                 
             key = poll_gpio()
             if key:
                 print(f"GPIO Keypad Pressed: {key}")
-                time.sleep(0.2)  # Debounce
                 return key
                 
             # Brief pause to prevent CPU hogging
@@ -136,32 +151,57 @@ def wait_for_keypress(buffer=None):
         input_thread.daemon = True
         input_thread.start()
         
-        # Wait for input with periodic checks for hook status
+        # Wait for input with timeout to check for hook changes
         while not input_ready.is_set():
-            # Simulate checking if phone is on hook
+            # Allow simulated hook state changes with 'h' key
+            if keyboard_input and keyboard_input.lower() == 'h':
+                phone_on_hook = not phone_on_hook
+                print(f"Simulated phone {'lifted' if not phone_on_hook else 'placed back'}")
+                hook_state_changed.set()
+                return None  # Return None to indicate hook state change
+                
+            # Check if simulated phone is on hook
+            if phone_on_hook:
+                return None  # Return None if phone is on hook
+                
             time.sleep(0.1)
             
         key = keyboard_input
-        # Allow for 'h' key to simulate hanging up
-        if key and (key.lower() == 'h' or key == ''):
-            return 'h'
-        return key if key else "1"  # Default to 1 if empty
+        # Handle empty input
+        if not key:
+            return "1"  # Default to 1 if empty
+            
+        return key
 
 def wait_for_hook_change(expected_state):
-    """Waits for the hook to be lifted or placed back."""
-    global phone_on_hook
+    """
+    Waits for the hook to change to the expected state.
+    expected_state: True to wait for phone to be lifted (off hook)
+                    False to wait for phone to be placed back (on hook)
+    """
+    global phone_on_hook, keyboard_input, input_ready
     
     if GPIO_AVAILABLE:
-        # The expected_state argument indicates:
-        # True: waiting for phone to be lifted (switch pressed, GPIO.LOW)
-        # False: waiting for phone to be placed back (switch released, GPIO.HIGH)
+        # In GPIO mode, continuously monitor until we see the expected state
+        target_gpio_state = GPIO.LOW if expected_state else GPIO.HIGH
         
-        switch_state = GPIO.LOW if expected_state else GPIO.HIGH
+        # Start a keyboard interrupt thread to allow bypassing
+        keyboard_input = None
+        input_ready.clear()
         
-        while GPIO.input(SWITCH_PIN) != switch_state:
+        input_thread = threading.Thread(target=keyboard_input_thread)
+        input_thread.daemon = True
+        input_thread.start()
+        
+        while GPIO.input(SWITCH_PIN) != target_gpio_state:
+            # Check for keyboard bypass
+            if input_ready.is_set():
+                print("Keyboard interrupt detected, bypassing hook wait")
+                break
+                
             time.sleep(0.1)
             
-        # Update the tracked state
+        # Update the global state
         phone_on_hook = not expected_state
         
         if expected_state:
@@ -169,10 +209,15 @@ def wait_for_hook_change(expected_state):
         else:
             print("Phone placed back on the hook")
     else:
-        if not expected_state:
-            input("Press Enter to simulate placing the phone back.")
-        else:
-            input("Press Enter to simulate lifting the phone.")
+        # For PC simulation, use keyboard input
+        message = "Press Enter to simulate lifting the phone" if expected_state else "Press Enter to simulate placing the phone back"
+        print(message + " (or type 'skip' to bypass): ")
         
-        # Update the tracked state for simulation
-        phone_on_hook = not expected_state
+        response = input().strip().lower()
+        if response != 'skip':
+            phone_on_hook = not expected_state
+            print(f"Simulated phone {'lifted off' if expected_state else 'placed back on'} the hook")
+
+# Start the hook monitoring thread when this module is imported
+if GPIO_AVAILABLE:
+    start_hook_monitoring()
