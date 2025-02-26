@@ -119,14 +119,21 @@ def is_phone_lifted():
         return GPIO.input(SWITCH_PIN) == GPIO.LOW
     else:
         return True  # Assume phone is lifted for PC testing
-
+if is_phone_lifted():
+    print("Phone is off the hook. Skipping initial screen.")
+else:
+    print("Waiting for phone to be lifted...")
+    wait_for_hook_change(expected_state=GPIO.LOW)
+    
 def wait_for_hook_change(expected_state):
-    """Waits for the hook to be lifted or placed back."""
+    """Waits for the hook to change to the expected state with debounce."""
     if GPIO_AVAILABLE:
-        while GPIO.input(SWITCH_PIN) != expected_state:
-            time.sleep(0.1)
-    else:
-        if not expected_state:
-            input("Press Enter to simulate placing the phone back.")
-        else:
-            input("Press Enter to simulate lifting the phone.")
+        previous_state = GPIO.input(SWITCH_PIN)
+        while True:
+            current_state = GPIO.input(SWITCH_PIN)
+            if current_state != previous_state:  # Detect state change
+                time.sleep(0.1)  # Debounce delay
+                if GPIO.input(SWITCH_PIN) == expected_state:
+                    return
+            previous_state = current_state
+            time.sleep(0.05)
