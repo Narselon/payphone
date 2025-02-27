@@ -13,8 +13,6 @@ class Scene:
         self.items_required = items_required if items_required else []
 
     def display(self, inventory):
-        # Clear the screen first to avoid duplicate display
-        # print("\033[H\033[J", end="")  # This clears the screen on ANSI-compatible terminals
         print("-" * 50)  
         print(self.text)
         
@@ -28,9 +26,8 @@ class Scene:
 
     def get_next_scene(self, choice, inventory):
         """
-        Determine the next scene based on choice and check item requirements.
-        Returns the next scene ID or None if the choice is invalid.
-        Also returns a message if inventory requirements aren't met.
+        Determine the next scene based on choice and inventory items.
+        Supports multiple branching paths based on specific items.
         """
         # Check if the choice is a special hidden connection
         if choice in self.hidden_connections:
@@ -40,21 +37,43 @@ class Scene:
         try:
             choice_index = int(choice)
             if choice_index in self.connections:
-                # Get target scene and check required items
-                target_scene_id = self.connections[choice_index][1]  # [1] is the scene ID
-                required_items = self.connections[choice_index][2] if len(self.connections[choice_index]) > 2 else []
+                connection_data = self.connections[choice_index]
+                option_text = connection_data[0]
                 
-                # Special case for calling someone without a phone number
-                if target_scene_id == "scene2" and "phone_number" not in inventory:
-                    return "no_numbers_scene", None
+                # Handle standard format: [text, target, required_items, alt_scene]
+                if len(connection_data) >= 2 and not isinstance(connection_data[1], dict):
+                    target_scene_id = connection_data[1]
+                    required_items = connection_data[2] if len(connection_data) > 2 else []
+                    alt_scene_id = connection_data[3] if len(connection_data) > 3 else None
+                    
+                    # Special case for calling without a phone number
+                    if target_scene_id == "scene2" and "phone_number" not in inventory:
+                        return "no_numbers_scene", None
+                    
+                    # Check if player has all required items
+                    if all(item in inventory for item in required_items):
+                        return target_scene_id, None
+                    elif alt_scene_id:
+                        return alt_scene_id, None
+                    else:
+                        missing_items = [item for item in required_items if item not in inventory]
+                        message = f"You can't do that. You need these items: {', '.join(missing_items)}"
+                        return None, message
                 
-                # Check if the player has all required items
-                if all(item in inventory for item in required_items):
-                    return target_scene_id, None
-                else:
-                    missing_items = [item for item in required_items if item not in inventory]
-                    message = f"You can't do that. You need these items: {', '.join(missing_items)}"
-                    return None, message
+                # Handle advanced branching: [text, {item1: scene1, item2: scene2, ..., "default": default_scene}]
+                elif len(connection_data) >= 2 and isinstance(connection_data[1], dict):
+                    paths = connection_data[1]
+                    
+                    # First check for specific items in inventory that have defined paths
+                    for item, scene_id in paths.items():
+                        if item in inventory and item != "default":
+                            return scene_id, None
+                    
+                    # If no matching item, use the default path if provided
+                    if "default" in paths:
+                        return paths["default"], None
+                    else:
+                        return None, "You don't have the right item for this action."
         except ValueError:
             pass  # Ignore non-integer choices (except for hidden ones)
             
@@ -88,12 +107,29 @@ def load_scenes():
                 # Handle different connection formats
                 if isinstance(data["connections"], dict):
                     for key, value in data["connections"].items():
+                        key_int = int(key)
+                        
                         # If the value is a string, it's just a scene ID
                         if isinstance(value, str):
-                            formatted_connections[int(key)] = [f"Go to {value}", value, []]
-                        # If it's a list/dict, it might contain more info
-                        elif isinstance(value, list) and len(value) >= 2:
-                            formatted_connections[int(key)] = [value[0], value[1], value[2] if len(value) > 2 else []]
+                            formatted_connections[key_int] = [f"Go to {value}", value, []]
+                        
+                        # If it's a list, it might be standard format or contain a dict for branching
+                        elif isinstance(value, list):
+                            if len(value) >= 2 and isinstance(value[1], dict):
+                                # This is the advanced branching format
+                                formatted_connections[key_int] = value
+                            else:
+                                # This is the standard format
+                                option_text = value[0]
+                                target_scene = value[1]
+                                required_items = value[2] if len(value) > 2 else []
+                                alt_scene = value[3] if len(value) > 3 else None
+                                formatted_connections[key_int] = [option_text, target_scene, required_items, alt_scene]
+                        
+                        # If it's a dict directly, it's the branching format
+                        elif isinstance(value, dict) and "text" in value and "paths" in value:
+                            formatted_connections[key_int] = [value["text"], value["paths"]]
+                            
                 elif isinstance(data["connections"], list):
                     # Simple list format [scene1, scene2, ...]
                     for i, scene_id in enumerate(data["connections"], 1):
