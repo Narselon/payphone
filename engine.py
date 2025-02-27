@@ -22,10 +22,9 @@ class Scene:
         if inventory:
             print("\nInventory:", ", ".join(inventory))
         
-        # We'll let the original code print the options
-        # This is commented out to avoid duplication
-        # for key, value in self.connections.items():
-        #     print(f"{key}. {value[0]}")
+        # Display available choices
+        for key, value in self.connections.items():
+            print(f"{key}. {value[0]}")
 
     def get_next_scene(self, choice, inventory):
         """
@@ -137,108 +136,110 @@ def main():
     print("- Press 'h' at any time to hang up the phone")
     print("- Press '*' followed by a sequence and '#' to enter codes")
     print("- Press '#' to view your inventory")
-    print("\n--- Press Enter to begin ---")
-    input()
+    print("\nWaiting for phone to be lifted...")
     
-    current_scene = "intro"  # Start scene
-    inventory = set()  # Player inventory
-    input_buffer = ""  # Buffer for multi-digit inputs
-    previous_scene = None  # Track previous scene for invalid choices
-    
-    print("Waiting for phone to be lifted...")
-    keypad.wait_for_hook_change(expected_state=True)  # Wait for off-hook
-
     while True:
-        scene = scenes.get(current_scene)
-        if not scene:
-            print(f"Error: Scene '{current_scene}' not found! Resetting to intro.")
-            current_scene = "intro"
-            continue
+        # Wait for the phone to be lifted to start/restart the game
+        keypad.wait_for_hook_change(expected_state=True)  # Wait for off-hook
+        
+        # Initialize game state
+        current_scene = "intro"  # Start scene
+        inventory = set()  # Player inventory
+        input_buffer = ""  # Buffer for multi-digit inputs
+        previous_scene = None  # Track previous scene for invalid choices
+        
+        # Game loop
+        while keypad.is_phone_lifted():
+            scene = scenes.get(current_scene)
+            if not scene:
+                print(f"Error: Scene '{current_scene}' not found! Resetting to intro.")
+                current_scene = "intro"
+                continue
 
-        # Check if we can enter the scene based on required items
-        if not all(item in inventory for item in scene.items_required):
-            missing_items = [item for item in scene.items_required if item not in inventory]
-            print(f"You can't go there yet. You need: {', '.join(missing_items)}")
-            time.sleep(2)  # Give player time to read the message
+            # Check if we can enter the scene based on required items
+            if not all(item in inventory for item in scene.items_required):
+                missing_items = [item for item in scene.items_required if item not in inventory]
+                print(f"You can't go there yet. You need: {', '.join(missing_items)}")
+                time.sleep(2)  # Give player time to read the message
+                
+                # Go back to the previous scene if possible, or intro if not
+                current_scene = previous_scene if previous_scene else "intro"
+                continue
             
-            # Go back to the previous scene if possible, or intro if not
-            current_scene = previous_scene if previous_scene else "intro"
-            continue
-        
-        # Store the current scene as previous for backtracking if needed
-        previous_scene = current_scene
-        
-        # Display the scene - display is modified to avoid duplication
-        scene.display(inventory)
-        
-        # Grant items from the scene
-        for item in scene.items_granted:
-            if item not in inventory:
-                inventory.add(item)
-                print(f"You obtained: {item}!")
-        
-        # Get player input
-        choice = keypad.wait_for_keypress()
-        
-        # Check for hang-up command
-        if choice == 'h' or choice == 'H':
-            print("Phone hung up. Resetting game...")
-            current_scene = "intro"
-            inventory.clear()
-            input_buffer = ""
-            print("\n--- Press Enter to lift the phone again ---")
-            keypad.wait_for_hook_change(expected_state=True)
-            continue
+            # Store the current scene as previous for backtracking if needed
+            previous_scene = current_scene
             
-        # Reset the game if phone is placed back on hook (physical switch)
-        if not keypad.is_phone_lifted():
-            print("Phone placed back. Resetting game...")
-            keypad.wait_for_hook_change(expected_state=True)  # Wait for next start
-            current_scene = "intro"
-            inventory.clear()
-            input_buffer = ""
-            continue
+            # Display the scene with options
+            scene.display(inventory)
             
-        # Handle special command for showing inventory
-        if choice == "#":
-            print("\nInventory:")
-            if inventory:
-                for item in inventory:
-                    print(f"- {item}")
-            else:
-                print("Empty")
-            print("\nPress any key to continue...")
-            keypad.wait_for_keypress()
+            # Grant items from the scene
+            for item in scene.items_granted:
+                if item not in inventory:
+                    inventory.add(item)
+                    print(f"You obtained: {item}!")
             
-            # Redisplay the scene without incrementing it
-            continue
+            # Get player input
+            choice = keypad.wait_for_keypress()
             
-        # Handle multi-digit input
-        if choice == "*":
-            # Allow for sequence input (for codes)
-            print("Enter sequence (press # when done):")
-            sequence = ""
-            while True:
-                digit = keypad.wait_for_keypress()
-                if digit == "#":
+            # If the hook state changed (phone hung up), break the game loop
+            if not keypad.is_phone_lifted() or choice is None:
+                print("Phone hung up. Game reset.")
+                break
+            
+            # Check for hang-up command
+            if choice == 'h' or choice == 'H':
+                print("Phone hung up. Resetting game...")
+                break
+                
+            # Handle special command for showing inventory
+            if choice == "#":
+                print("\nInventory:")
+                if inventory:
+                    for item in inventory:
+                        print(f"- {item}")
+                else:
+                    print("Empty")
+                print("\nPress any key to continue...")
+                keypad.wait_for_keypress()
+                
+                # Redisplay the scene without incrementing it
+                continue
+                
+            # Handle multi-digit input
+            if choice == "*":
+                # Allow for sequence input (for codes)
+                print("Enter sequence (press # when done):")
+                sequence = ""
+                while keypad.is_phone_lifted():
+                    digit = keypad.wait_for_keypress()
+                    if digit is None:  # Check if phone was hung up
+                        break
+                    if digit == "#":
+                        break
+                    elif digit in "0123456789":
+                        sequence += digit
+                        print(digit, end="", flush=True)
+                print()  # New line after sequence
+                choice = sequence
+                
+                # If phone was hung up during sequence entry, break the game loop
+                if not keypad.is_phone_lifted():
+                    print("Phone hung up. Game reset.")
                     break
-                elif digit in "0123456789":
-                    sequence += digit
-                    print(digit, end="", flush=True)
-            print()  # New line after sequence
-            choice = sequence
 
-        # Get next scene based on user choice
-        next_scene, message = scene.get_next_scene(choice, inventory)
+            # Get next scene based on user choice
+            next_scene, message = scene.get_next_scene(choice, inventory)
 
-        if next_scene:
-            current_scene = next_scene
-        elif message:
-            print(message)
-            time.sleep(1.5)  # Give player time to read
-        else:
-            print("Invalid choice. Try again.")
-            time.sleep(1)
+            if next_scene:
+                current_scene = next_scene
+            elif message:
+                print(message)
+                time.sleep(1.5)  # Give player time to read
+            else:
+                print("Invalid choice. Try again.")
+                time.sleep(1)
+        
+        print("Game reset. Waiting for phone to be lifted...")
 
 
 if __name__ == "__main__":
