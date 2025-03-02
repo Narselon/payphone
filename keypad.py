@@ -1,6 +1,7 @@
 import sys
 import time
 import threading
+import pygame  # For playing MP3 sounds
 
 try:
     import RPi.GPIO as GPIO
@@ -36,6 +37,27 @@ if GPIO_AVAILABLE:
         ["*", "0", "#"]
     ]
 
+# Initialize sound system
+pygame.mixer.init()
+
+# Sound configuration
+SOUND_DIRECTORY = "sounds/"  # Directory where sound files are stored
+KEYPAD_SOUNDS = {
+    "1": "key1.mp3",
+    "2": "key2.mp3",
+    "3": "key3.mp3",
+    "4": "key4.mp3",
+    "5": "key5.mp3",
+    "6": "key6.mp3",
+    "7": "key7.mp3",
+    "8": "key8.mp3",
+    "9": "key9.mp3",
+    "0": "key0.mp3",
+    "*": "star.mp3",
+    "#": "hash.mp3",
+    "default": "beep.mp3"  # Default sound if specific key sound is not found
+}
+
 # Global variables for input handling
 keyboard_input = None
 input_ready = threading.Event()
@@ -43,6 +65,28 @@ phone_on_hook = True  # Track the state of the phone hook
 hook_state_changed = threading.Event()
 last_keypress_time = 0  # Track the time of the last keypress
 KEYPRESS_DELAY = 0.5  # Delay between keypresses in seconds
+
+# Multi-digit input variables
+input_buffer = ""
+CODE_ENTRY_MODE = False
+CODE_TIMEOUT = 3  # Seconds before code entry times out
+
+def play_keypad_sound(key):
+    """Play the sound associated with a specific key."""
+    try:
+        # Determine which sound file to play
+        sound_file = KEYPAD_SOUNDS.get(key, KEYPAD_SOUNDS["default"])
+        sound_path = SOUND_DIRECTORY + sound_file
+        
+        # Play the sound
+        pygame.mixer.music.load(sound_path)
+        pygame.mixer.music.play()
+    except Exception as e:
+        print(f"Error playing sound: {e}")
+        # If directory doesn't exist or error occurs, create the directory
+        import os
+        os.makedirs(SOUND_DIRECTORY, exist_ok=True)
+        print(f"Created sounds directory. Please add mp3 files to: {SOUND_DIRECTORY}")
 
 def poll_gpio():
     """Checks for a key press on the physical keypad."""
@@ -54,8 +98,10 @@ def poll_gpio():
         for row_index, row in enumerate(ROWS):
             if GPIO.input(row) == GPIO.LOW:
                 GPIO.output(col, GPIO.HIGH)
+                key = KEYPAD_MAPPING[row_index][col_index]
                 time.sleep(0.2)  # Debounce
-                return KEYPAD_MAPPING[row_index][col_index]
+                play_keypad_sound(key)  # Play sound for the key pressed
+                return key
         GPIO.output(col, GPIO.HIGH)
     return None
 
@@ -63,6 +109,12 @@ def keyboard_input_thread():
     """Thread function to handle keyboard input."""
     global keyboard_input
     keyboard_input = input("").strip()
+    
+    # If we're running in simulation mode, play the associated sound
+    if not GPIO_AVAILABLE and keyboard_input and len(keyboard_input) == 1:
+        if keyboard_input in KEYPAD_SOUNDS:
+            play_keypad_sound(keyboard_input)
+    
     input_ready.set()
 
 def hook_monitoring_thread():
@@ -109,14 +161,42 @@ def is_phone_lifted():
             return not phone_on_hook
         return not phone_on_hook  # Return the current simulated state
 
-def wait_for_keypress(buffer=None):
+def wait_for_code_input():
     """
-    Waits for a key press from either the GPIO keypad or keyboard.
-    Supports a buffer for multi-digit inputs.
+    Waits for a sequence of keypresses that make up a code.
+    Returns the complete code when user presses '#' or times out.
+    """
+    global input_buffer
     
-    Args:
-        buffer: Optional string buffer for multi-digit inputs
-    """
+    print("Enter code (press # when done):")
+    input_buffer = ""
+    start_time = time.time()
+    
+    while is_phone_lifted() and (time.time() - start_time) < CODE_TIMEOUT:
+        key = wait_for_single_keypress()
+        
+        if key is None:  # Phone hung up
+            return None
+            
+        if key == "#":  # End of code input
+            if input_buffer:  # Only if there's something in the buffer
+                return input_buffer
+            else:
+                return "#"  # Return # by itself if no code entered
+                
+        # Add the key to the buffer
+        input_buffer += key
+        print(key, end="", flush=True)
+        
+        # Reset the timeout
+        start_time = time.time()
+    
+    # Return the buffer if timeout occurred
+    print("\nInput timeout.")
+    return input_buffer if input_buffer else None
+
+def wait_for_single_keypress():
+    """Waits for a single keypress without any buffering."""
     global keyboard_input, hook_state_changed, phone_on_hook, last_keypress_time
     
     # Check for keypress delay to prevent accidental skipping
@@ -124,18 +204,10 @@ def wait_for_keypress(buffer=None):
     if current_time - last_keypress_time < KEYPRESS_DELAY:
         time.sleep(KEYPRESS_DELAY - (current_time - last_keypress_time))
     
-    if buffer:
-        print(f"Current buffer: {buffer}")
-    
     # Reset the hook state change event
     hook_state_changed.clear()
     
     if GPIO_AVAILABLE:
-        # Check if there's something in the buffer first
-        if buffer:
-            last_keypress_time = time.time()
-            return buffer
-            
         # Poll the GPIO keypad until key press or hook state change
         while True:
             # Check if the hook state has changed
@@ -144,7 +216,7 @@ def wait_for_keypress(buffer=None):
                 
             key = poll_gpio()
             if key:
-                print(f"GPIO Keypad Pressed: {key}")
+                print(f"Keypad pressed: {key}")
                 last_keypress_time = time.time()
                 return key
                 
@@ -181,7 +253,23 @@ def wait_for_keypress(buffer=None):
             last_keypress_time = time.time()
             return "1"  # Default to 1 if empty
         
+        # For PC simulation, just take the first character if multiple were entered
+        if len(key) > 1:
+            key = key[0]
+            
         last_keypress_time = time.time()
+        return key
+
+def wait_for_keypress():
+    """
+    Main input function that handles both regular keypresses and code input.
+    Returns a single key or a complete code sequence.
+    """
+    key = wait_for_single_keypress()
+    
+    if key == "*":  # Start code entry mode
+        return wait_for_code_input()
+    else:
         return key
 
 def wait_for_hook_change(expected_state):

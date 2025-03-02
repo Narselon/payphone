@@ -170,9 +170,14 @@ def main():
     print("\nGame Controls:")
     print("- Use number keys to select options")
     print("- Press 'h' at any time to hang up the phone")
-    print("- Press '*' followed by a sequence and '#' to enter codes")
+    print("- Press '*' to start entering a code, then enter your code and press '#' when done")
     print("- Press '#' to view your inventory")
     print("\nWaiting for phone to be lifted...")
+    
+    # Check if sounds directory exists, create if not
+    if not os.path.exists("sounds"):
+        os.makedirs("sounds", exist_ok=True)
+        print("Created 'sounds' directory. Please add mp3 files for each keypad key.")
     
     while True:
         # Wait for the phone to be lifted to start/restart the game
@@ -181,7 +186,6 @@ def main():
         # Initialize game state
         current_scene = "intro"  # Start scene
         inventory = set()  # Player inventory
-        input_buffer = ""  # Buffer for multi-digit inputs
         previous_scene = None  # Track previous scene for invalid choices
         
         # Game loop
@@ -214,7 +218,7 @@ def main():
                     inventory.add(item)
                     print(f"You obtained: {item}!")
             
-            # Get player input
+            # Get player input - using the new wait_for_keypress that handles code entry
             choice = keypad.wait_for_keypress()
             
             # If the hook state changed (phone hung up), break the game loop
@@ -236,32 +240,10 @@ def main():
                 else:
                     print("Empty")
                 print("\nPress any key to continue...")
-                keypad.wait_for_keypress()
+                keypad.wait_for_single_keypress()
                 
                 # Redisplay the scene without incrementing it
                 continue
-                
-            # Handle multi-digit input
-            if choice == "*":
-                # Allow for sequence input (for codes)
-                print("Enter sequence (press # when done):")
-                sequence = ""
-                while keypad.is_phone_lifted():
-                    digit = keypad.wait_for_keypress()
-                    if digit is None:  # Check if phone was hung up
-                        break
-                    if digit == "#":
-                        break
-                    elif digit in "0123456789":
-                        sequence += digit
-                        print(digit, end="", flush=True)
-                print()  # New line after sequence
-                choice = sequence
-                
-                # If phone was hung up during sequence entry, break the game loop
-                if not keypad.is_phone_lifted():
-                    print("Phone hung up. Game reset.")
-                    break
 
             # Get next scene based on user choice
             next_scene, message = scene.get_next_scene(choice, inventory)
