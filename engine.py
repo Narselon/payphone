@@ -2,6 +2,7 @@ import os
 import yaml
 import keypad
 import time
+from scene_audio import SceneAudio  # Import the new SceneAudio class
 
 class Scene:
     def __init__(self, id, text, connections, hidden_connections=None, items_granted=None, items_required=None):
@@ -167,6 +168,10 @@ def load_scenes():
 def main():
     scenes = load_scenes()
     print(f"DEBUG: Loaded scenes = {scenes.keys()}")
+    
+    # Initialize scene audio
+    scene_audio = SceneAudio()
+    
     print("\nGame Controls:")
     print("- Use number keys to select options")
     print("- Press 'h' at any time to hang up the phone")
@@ -178,6 +183,11 @@ def main():
     if not os.path.exists("sounds"):
         os.makedirs("sounds", exist_ok=True)
         print("Created 'sounds' directory. Please add mp3 files for each keypad key.")
+    
+    # Make sure scene_audio directory exists 
+    if not os.path.exists("scene_audio"):
+        os.makedirs("scene_audio", exist_ok=True)
+        print("Created 'scene_audio' directory. Please add mp3 files for each scene (format: scene_id.mp3)")
     
     while True:
         # Wait for the phone to be lifted to start/restart the game
@@ -206,6 +216,9 @@ def main():
                 current_scene = previous_scene if previous_scene else "intro"
                 continue
             
+            # Play scene audio
+            scene_audio.play_scene_audio(current_scene)
+            
             # Store the current scene as previous for backtracking if needed
             previous_scene = current_scene
             
@@ -224,11 +237,13 @@ def main():
             # If the hook state changed (phone hung up), break the game loop
             if not keypad.is_phone_lifted() or choice is None:
                 print("Phone hung up. Game reset.")
+                scene_audio.stop_audio()  # Stop any playing audio
                 break
             
             # Check for hang-up command
             if choice == 'h' or choice == 'H':
                 print("Phone hung up. Resetting game...")
+                scene_audio.stop_audio()  # Stop any playing audio
                 break
                 
             # Handle special command for showing inventory
@@ -249,6 +264,9 @@ def main():
             next_scene, message = scene.get_next_scene(choice, inventory)
 
             if next_scene:
+                # If scene changes, play the new scene audio
+                if next_scene != current_scene:
+                    scene_audio.stop_audio()  # Stop current audio before changing scenes
                 current_scene = next_scene
             elif message:
                 print(message)
@@ -257,6 +275,8 @@ def main():
                 print("Invalid choice. Try again.")
                 time.sleep(1)
         
+        # Stop audio when game resets
+        scene_audio.stop_audio()
         print("Game reset. Waiting for phone to be lifted...")
 
 
