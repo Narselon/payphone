@@ -3,6 +3,7 @@ import yaml
 import keypad
 import time
 from scene_audio import SceneAudio  # Import the new SceneAudio class
+from payphone import payphone  # Import the payphone module
 
 class Scene:
     def __init__(self, id, text, connections, hidden_connections=None, items_granted=None, items_required=None):
@@ -191,7 +192,8 @@ def main():
     
     while True:
         # Wait for the phone to be lifted to start/restart the game
-        keypad.wait_for_hook_change(expected_state=True)  # Wait for off-hook
+        keypad.wait_for_hook_change(expected_state=True)
+        payphone.start_adventure()  # Add this line
         
         # Initialize game state
         current_scene = "intro"  # Start scene
@@ -277,6 +279,7 @@ def main():
         
         # Stop audio when game resets
         scene_audio.stop_audio()
+        payphone.stop_adventure()  # Add this line
         print("Game reset. Waiting for phone to be lifted...")
 
 
