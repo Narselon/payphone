@@ -12,6 +12,9 @@ class SceneAudio:
         self.sounds_dir = sounds_dir
         self.current_scene_sound = None
         
+        # Initialize the mixer specifically for AIY voice hat
+        pygame.mixer.init(channels=2, device="aiy-voice-hat")
+        
         # Create directories if they don't exist
         os.makedirs(audio_dir, exist_ok=True)
         os.makedirs(sounds_dir, exist_ok=True)

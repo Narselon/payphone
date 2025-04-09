@@ -14,9 +14,9 @@ if GPIO_AVAILABLE:
     GPIO.setup(LIGHT_PIN, GPIO.OUT)
     GPIO.output(LIGHT_PIN, GPIO.LOW)
 
-# Initialize pygame mixer for audio if not already done
-if not pygame.mixer.get_init():
-    pygame.mixer.init()
+# Initialize a separate pygame mixer for aux output
+pygame.mixer.pre_init(44100, -16, 2, 2048)
+pygame.mixer.init(devicename="hw:0,0")  # Use default audio device (aux)
 
 class PayPhone:
     def __init__(self, audio_dir="sounds"):
