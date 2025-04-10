@@ -8,79 +8,88 @@ class SceneAudio:
         self.sounds_dir = sounds_dir
         self.current_scene_sound = None
         
-        # Initialize the mixer specifically for AIY voice hat
+        # Initialize multiple mixer channels for different audio types
+        pygame.mixer.pre_init(44100, -16, 2, 2048)
         try:
-            pygame.mixer.init(channels=2, devicename="hw:CARD=sndrpigooglevoi")
-            print("Initialized AIY voice hat audio")
+            pygame.mixer.init(channels=4)  # Initialize with 4 channels
+            print("Audio system initialized successfully")
+            
+            # Reserve specific channels
+            self.beep_channel = pygame.mixer.Channel(0)
+            self.scene_channel = pygame.mixer.Channel(1)
+            self.keypad_channel = pygame.mixer.Channel(2)
+            
         except Exception as e:
-            print(f"Error initializing AIY voice hat: {e}")
-            # Fallback to default audio if voice hat fails
-            pygame.mixer.init()
+            print(f"Error initializing audio system: {e}")
+            # Fallback initialization
+            try:
+                pygame.mixer.init()
+                print("Fallback audio initialization successful")
+            except Exception as e:
+                print(f"Critical audio initialization error: {e}")
         
         # Create directories if they don't exist
         os.makedirs(audio_dir, exist_ok=True)
         os.makedirs(sounds_dir, exist_ok=True)
         
-    def play_key_beep(self, *args, **kwargs):
-        """
-        Play a short beep sound before scene audio.
-        Uses the default beep from keypad sounds.
-        Accepts optional arguments to make it flexible
-        Skips beep for initial scenes or hook toggles
-        """
-        # Check if scene is one that should skip beep
-        if kwargs.get('skip_beep', False):
-            return
-        
+        # Pre-load common sounds
+        self.beep_sound = None
         try:
             beep_path = os.path.join(self.sounds_dir, "beep.mp3")
             if os.path.exists(beep_path):
-                # Create a separate mixer channel for the beep
-                beep_channel = pygame.mixer.Channel(1)  # Use a different channel than keypad sounds
-                beep_sound = pygame.mixer.Sound(beep_path)
-                beep_channel.play(beep_sound)
-                
-                # Short delay to ensure beep plays before scene audio
-                time.sleep(0.2)
-            else:
-                print(f"Beep sound not found at {beep_path}")
+                self.beep_sound = pygame.mixer.Sound(beep_path)
         except Exception as e:
-            print(f"Error playing beep sound: {e}")
+            print(f"Error loading beep sound: {e}")
+        
+    def play_key_beep(self, *args, **kwargs):
+        """Play a short beep sound before scene audio."""
+        if kwargs.get('skip_beep', False):
+            return
+            
+        try:
+            if self.beep_sound and self.beep_channel:
+                # Stop any currently playing beep
+                self.beep_channel.stop()
+                self.beep_channel.play(self.beep_sound)
+                time.sleep(0.1)  # Shorter delay to feel more responsive
+        except Exception as e:
+            print(f"Error playing beep: {e}")
         
     def play_scene_audio(self, scene_id):
-        """
-        Plays audio associated with a scene.
-        Follows naming convention: scene_id.mp3
-        Plays a key beep before scene audio
-        """
-        # Stop any currently playing scene audio
-        if self.current_scene_sound and pygame.mixer.music.get_busy():
-            pygame.mixer.music.stop()
-        
-        # Special scenes or states where we want to skip the beep
-        skip_beep_scenes = ['intro', 'no_numbers_scene']
-        
-        # Play key beep first - with option to skip
-        self.play_key_beep(skip_beep=scene_id in skip_beep_scenes)
-            
-        # Try to load and play the scene audio
-        audio_path = os.path.join(self.audio_dir, f"{scene_id}.mp3")
-        
+        """Plays audio associated with a scene."""
         try:
+            # First stop any currently playing scene audio
+            self.scene_channel.stop()
+            
+            # Special scenes that skip beep
+            skip_beep_scenes = ['intro', 'no_numbers_scene']
+            
+            # Play key beep unless in skip list
+            if scene_id not in skip_beep_scenes:
+                self.play_key_beep()
+                
+            # Load and play scene audio
+            audio_path = os.path.join(self.audio_dir, f"{scene_id}.mp3")
             if os.path.exists(audio_path):
-                pygame.mixer.music.load(audio_path)
-                pygame.mixer.music.play()
-                print(f"Playing audio for scene: {scene_id}")
+                scene_sound = pygame.mixer.Sound(audio_path)
+                self.scene_channel.play(scene_sound)
                 self.current_scene_sound = scene_id
+                print(f"Playing audio for scene: {scene_id}")
             else:
                 print(f"Audio file not found for scene: {scene_id}")
                 self.current_scene_sound = None
+                
         except Exception as e:
-            print(f"Error playing scene audio: {e}")
+            print(f"Error in play_scene_audio: {e}")
             self.current_scene_sound = None
             
     def stop_audio(self):
-        """Stops any currently playing scene audio"""
-        if pygame.mixer.music.get_busy():
-            pygame.mixer.music.stop()
+        """Stops all audio playback"""
+        try:
+            # Stop all channels
+            self.beep_channel.stop()
+            self.scene_channel.stop()
+            self.keypad_channel.stop()
             self.current_scene_sound = None
+        except Exception as e:
+            print(f"Error stopping audio: {e}")
