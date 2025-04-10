@@ -2,6 +2,8 @@ import sys
 import time
 import threading
 import pygame  # For playing MP3 sounds
+import atexit
+from threading import Lock
 
 try:
     import RPi.GPIO as GPIO
@@ -71,6 +73,10 @@ input_buffer = ""
 CODE_ENTRY_MODE = False
 CODE_TIMEOUT = 3  # Seconds before code entry times out
 
+_input_thread = None
+_input_thread_lock = Lock()
+_should_stop = False
+
 def play_keypad_sound(key):
     """Play the sound associated with a specific key."""
     try:
@@ -107,15 +113,19 @@ def poll_gpio():
 
 def keyboard_input_thread():
     """Thread function to handle keyboard input."""
-    global keyboard_input
-    keyboard_input = input("").strip()
+    global keyboard_input, _should_stop
     
-    # If we're running in simulation mode, play the associated sound
-    if not GPIO_AVAILABLE and keyboard_input and len(keyboard_input) == 1:
-        if keyboard_input in KEYPAD_SOUNDS:
-            play_keypad_sound(keyboard_input)
-    
-    input_ready.set()
+    try:
+        while not _should_stop:
+            keyboard_input = input().strip()
+            if keyboard_input:
+                if not GPIO_AVAILABLE and len(keyboard_input) == 1:
+                    if keyboard_input in KEYPAD_SOUNDS:
+                        play_keypad_sound(keyboard_input)
+                input_ready.set()
+                break
+    except (EOFError, KeyboardInterrupt):
+        _should_stop = True
 
 def hook_monitoring_thread():
     """Thread function to continuously monitor the hook state."""
@@ -273,6 +283,60 @@ def wait_for_keypress():
         return key
 
 def wait_for_hook_change(expected_state):
+    """Waits for the hook to change to the expected state."""
+    global phone_on_hook, keyboard_input, input_ready, _input_thread
+    
+    if GPIO_AVAILABLE:
+        target_gpio_state = GPIO.LOW if expected_state else GPIO.HIGH
+        
+        with _input_thread_lock:
+            # Clean up existing thread if any
+            if _input_thread and _input_thread.is_alive():
+                _input_thread.join(timeout=0.5)
+            
+            # Reset states
+            keyboard_input = None
+            input_ready.clear()
+            
+            # Create and start new thread
+            _input_thread = threading.Thread(target=keyboard_input_thread)
+            _input_thread.daemon = True
+            _input_thread.start()
+        
+        while GPIO.input(SWITCH_PIN) != target_gpio_state and not _should_stop:
+            if input_ready.is_set():
+                print("Keyboard interrupt detected, bypassing hook wait")
+                phone_on_hook = not expected_state
+                return False
+            
+            time.sleep(0.1)
+            
+        if _should_stop:
+            return False
+            
+        phone_on_hook = not expected_state
+        print("Phone " + ("lifted off" if expected_state else "placed back on") + " the hook")
+        return True
+        
+    else:
+        # PC simulation code remains unchanged
+        message = "Press Enter to simulate lifting the phone" if expected_state else "Press Enter to simulate placing the phone back"
+        print(message + " (or type 'skip' to bypass): ")
+        
+        try:
+            response = input().strip().lower()
+            if response == 'skip':
+                phone_on_hook = not expected_state
+                print(f"Bypassed: Assuming phone {'lifted off' if expected_state else 'placed back on'} the hook")
+                return False
+            else:
+                phone_on_hook = not expected_state
+                print(f"Simulated phone {'lifted off' if expected_state else 'placed back on'} the hook")
+                return True
+        except (KeyboardInterrupt, EOFError):
+            return False
+
+def wait_for_hook_change(expected_state):
     """
     Waits for the hook to change to the expected state.
     expected_state: True to wait for phone to be lifted (off hook)
@@ -330,6 +394,16 @@ def wait_for_hook_change(expected_state):
             phone_on_hook = not expected_state
             print(f"Simulated phone {'lifted off' if expected_state else 'placed back on'} the hook")
             return True
+
+def cleanup_threads():
+    """Cleanup function to terminate threads safely"""
+    global _should_stop
+    _should_stop = True
+    if _input_thread and _input_thread.is_alive():
+        _input_thread.join(timeout=1.0)
+
+# Register cleanup
+atexit.register(cleanup_threads)
 
 # Start the hook monitoring thread when this module is imported
 if GPIO_AVAILABLE:
