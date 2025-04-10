@@ -2,10 +2,6 @@ import pygame
 import os
 import time
 
-# Initialize pygame mixer if not already initialized
-if not pygame.mixer.get_init():
-    pygame.mixer.init()
-
 class SceneAudio:
     def __init__(self, audio_dir="scene_audio", sounds_dir="sounds"):
         self.audio_dir = audio_dir
@@ -13,7 +9,13 @@ class SceneAudio:
         self.current_scene_sound = None
         
         # Initialize the mixer specifically for AIY voice hat
-        pygame.mixer.init(channels=2, device="aiy-voice-hat")
+        try:
+            pygame.mixer.init(channels=2, devicename="hw:CARD=sndrpigooglevoi")
+            print("Initialized AIY voice hat audio")
+        except Exception as e:
+            print(f"Error initializing AIY voice hat: {e}")
+            # Fallback to default audio if voice hat fails
+            pygame.mixer.init()
         
         # Create directories if they don't exist
         os.makedirs(audio_dir, exist_ok=True)
