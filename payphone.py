@@ -6,6 +6,7 @@ import pygame
 import os
 import time  # Add this import
 from keypad import GPIO_AVAILABLE
+import keyboard  # Add this import at top
 
 # Pin definitions
 LIGHT_PIN = 25  # Choose an unused GPIO pin
@@ -26,12 +27,17 @@ class PayPhone:
         self.adventure_active = False
         self.last_ring_time = time.time()
         self.ring_volume = 1.0  # Full volume
+        self.debug_mode = True  # Add debug mode flag
         self.load_sounds()
         
-        # Start random ring thread
+        # Start threads
         self.ring_thread = threading.Thread(target=self._random_ring_controller, daemon=True)
         self.ring_thread.start()
-        print("Ring thread started successfully")
+        
+        # Setup debug controls
+        if self.debug_mode:
+            keyboard.on_press_key('r', self._debug_ring_trigger)
+            print("Debug mode active - Press 'R' key to test ring")
 
     def load_sounds(self):
         """Load the ring sound file"""
@@ -80,6 +86,12 @@ class PayPhone:
                     self.last_ring_time = current_time
                 
             time.sleep(60)  # Check every minute
+
+    def _debug_ring_trigger(self, _):
+        """Debug method to trigger ring manually"""
+        if self.debug_mode and not self.adventure_active:
+            print("Manual ring triggered")
+            self.play_ring()
 
     def start_adventure(self):
         """Called when starting the adventure"""
