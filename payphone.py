@@ -24,17 +24,22 @@ class PayPhone:
         self.audio_dir = audio_dir
         self.ring_sound = None
         self.adventure_active = False
+        self.last_ring_time = time.time()
+        self.ring_volume = 1.0  # Full volume
         self.load_sounds()
         
         # Start random ring thread
         self.ring_thread = threading.Thread(target=self._random_ring_controller, daemon=True)
         self.ring_thread.start()
+        print("Ring thread started successfully")
 
     def load_sounds(self):
         """Load the ring sound file"""
         ring_path = os.path.join(self.audio_dir, "ring.mp3")
         if os.path.exists(ring_path):
             self.ring_sound = pygame.mixer.Sound(ring_path)
+            self.ring_sound.set_volume(self.ring_volume)
+            print(f"Ring sound loaded from {ring_path}")
         else:
             print(f"Ring sound not found at {ring_path}")
 
@@ -46,24 +51,35 @@ class PayPhone:
     def play_ring(self, duration=3):
         """Play the ring sound and control light"""
         if self.ring_sound:
+            print("Attempting to play ring sound...")
             self.set_light(GPIO.HIGH)
             self.ring_sound.play()
-            import time
             time.sleep(duration)
             self.ring_sound.stop()
             self.set_light(GPIO.LOW)
+            print("Ring sound completed")
 
     def _random_ring_controller(self):
         """Background thread to handle random ringing"""
         while True:
             now = datetime.now().time()
+            current_time = time.time()
+            
+            # Debug output
+            if datetime_time(14,0) <= now <= datetime_time(17,0):
+                print(f"Current time {now} is within ring window")
+            
             # Only ring between 2 PM and 5 PM
             if (datetime_time(14,0) <= now <= datetime_time(17,0) and 
-                not self.adventure_active):
-                if random.random() < 0.1:  # 10% chance to ring
+                not self.adventure_active and
+                current_time - self.last_ring_time >= 300):  # At least 5 minutes since last ring
+                
+                if random.random() < 0.3:  # Increase chance to 30%
+                    print("Triggering random ring...")
                     self.play_ring()
-                time.sleep(300)  # Now using the correct time.sleep
-            time.sleep(60)
+                    self.last_ring_time = current_time
+                
+            time.sleep(60)  # Check every minute
 
     def start_adventure(self):
         """Called when starting the adventure"""
