@@ -26,18 +26,14 @@ class PayPhone:
         self.ring_sound = None
         self.adventure_active = False
         self.last_ring_time = time.time()
-        self.ring_volume = 1.0  # Full volume
-        self.debug_mode = True  # Add debug mode flag
+        self.ring_volume = 1.0
+        self.debug_mode = True
         self.load_sounds()
         
-        # Start threads
+        # Start ring thread
         self.ring_thread = threading.Thread(target=self._random_ring_controller, daemon=True)
         self.ring_thread.start()
-        
-        # Setup debug controls
-        if self.debug_mode:
-            keyboard.on_press_key('r', self._debug_ring_trigger)
-            print("Debug mode active - Press 'R' key to test ring")
+        print("Debug mode active - Press 'r' key to test ring")
 
     def load_sounds(self):
         """Load the ring sound file"""
