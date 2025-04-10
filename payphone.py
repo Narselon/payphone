@@ -1,9 +1,10 @@
 import RPi.GPIO as GPIO
-from datetime import datetime, time
+from datetime import datetime, time as datetime_time  # Rename to avoid conflict
 import random
 import threading
 import pygame
 import os
+import time  # Add this import
 from keypad import GPIO_AVAILABLE
 
 # Pin definitions
@@ -57,12 +58,11 @@ class PayPhone:
         while True:
             now = datetime.now().time()
             # Only ring between 2 PM and 5 PM
-            if (time(914,0) <= now <= time(17,0) and 
+            if (datetime_time(14,0) <= now <= datetime_time(17,0) and 
                 not self.adventure_active):
                 if random.random() < 0.1:  # 10% chance to ring
                     self.play_ring()
-                import time
-                time.sleep(300)  # Check every 5 minutes
+                time.sleep(300)  # Now using the correct time.sleep
             time.sleep(60)
 
     def start_adventure(self):
