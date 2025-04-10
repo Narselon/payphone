@@ -6,7 +6,7 @@ import pygame
 import os
 import time  # Add this import
 from keypad import GPIO_AVAILABLE
-import keyboard  # Add this import at top
+#import keyboard  # Add this import at top
 
 # Pin definitions
 LIGHT_PIN = 25  # Choose an unused GPIO pin
