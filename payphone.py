@@ -28,6 +28,12 @@ class PayPhone:
         self.last_ring_time = time.time()
         self.ring_volume = 1.0
         self.debug_mode = True
+        
+        # Initialize separate mixer for ring audio on aux
+        pygame.mixer.quit()  # Close any existing mixer
+        pygame.mixer.pre_init(44100, -16, 2, 2048)
+        pygame.mixer.init(devicename="hw:0,0")  # Use hardware device 0,0 (aux)
+        
         self.load_sounds()
         
         # Start ring thread
@@ -53,7 +59,7 @@ class PayPhone:
     def play_ring(self, duration=3):
         """Play the ring sound and control light"""
         if self.ring_sound:
-            print("Attempting to play ring sound...")
+            print("Attempting to play ring sound on aux...")
             self.set_light(GPIO.HIGH)
             self.ring_sound.play()
             time.sleep(duration)
