@@ -4,6 +4,7 @@ import threading
 import pygame  # For playing MP3 sounds
 import atexit
 from threading import Lock
+from threading import Event
 
 try:
     import RPi.GPIO as GPIO
@@ -77,6 +78,50 @@ CODE_TIMEOUT = 3  # Seconds before code entry times out
 _input_thread = None
 _input_thread_lock = Lock()
 _should_stop = False
+
+phone_on_hook = True
+hook_state_changed = Event()
+
+def wait_for_hook_change(expected_state):
+    """Waits for the hook to change to the expected state."""
+    global phone_on_hook, keyboard_input, input_ready
+    
+    if GPIO_AVAILABLE:
+        target_gpio_state = GPIO.LOW if expected_state else GPIO.HIGH
+        
+        while GPIO.input(SWITCH_PIN) != target_gpio_state:
+            if input_ready.is_set():
+                print("Keyboard interrupt detected")
+                phone_on_hook = not expected_state
+                return False
+            time.sleep(0.1)
+            
+        phone_on_hook = not expected_state
+        print("Phone " + ("lifted off" if expected_state else "placed back on") + " the hook")
+        return True
+        
+    else:
+        # PC simulation code
+        message = "Press Enter to simulate lifting the phone" if expected_state else "Press Enter to simulate placing the phone back"
+        print(message + " (or type 'skip' to bypass): ")
+        
+        try:
+            response = input().strip().lower()
+            if response == 'skip':
+                phone_on_hook = not expected_state
+                print(f"Bypassed: Assuming phone {'lifted off' if expected_state else 'placed back on'} the hook")
+                return False
+            else:
+                phone_on_hook = not expected_state
+                print(f"Simulated phone {'lifted off' if expected_state else 'placed back on'} the hook")
+                return True
+        except (KeyboardInterrupt, EOFError):
+            return False
+
+def is_phone_lifted():
+    """Returns True if phone is off hook, False otherwise."""
+    global phone_on_hook
+    return not phone_on_hook
 
 def keyboard_input_thread():
     global keyboard_input, _should_stop
