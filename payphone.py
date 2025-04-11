@@ -29,10 +29,22 @@ class PayPhone:
         self.ring_volume = 1.0
         self.debug_mode = True
         
-        # Initialize separate mixer for ring audio on aux
-        pygame.mixer.quit()  # Close any existing mixer
-        pygame.mixer.pre_init(44100, -16, 2, 2048)
-        pygame.mixer.init(devicename="hw:0,0")  # Use hardware device 0,0 (aux)
+        # Initialize mixer for ring audio
+        try:
+            # Try hardware device first
+            pygame.mixer.quit()
+            pygame.mixer.pre_init(44100, -16, 2, 2048)
+            pygame.mixer.init(devicename="hw:0,0")
+            print("Initialized audio with hw:0,0")
+        except pygame.error:
+            try:
+                # Fallback to default device
+                pygame.mixer.quit()
+                pygame.mixer.pre_init(44100, -16, 2, 2048)
+                pygame.mixer.init()
+                print("Initialized audio with default device")
+            except Exception as e:
+                print(f"Critical audio initialization error: {e}")
         
         self.load_sounds()
         
@@ -45,9 +57,12 @@ class PayPhone:
         """Load the ring sound file"""
         ring_path = os.path.join(self.audio_dir, "ring.mp3")
         if os.path.exists(ring_path):
-            self.ring_sound = pygame.mixer.Sound(ring_path)
-            self.ring_sound.set_volume(self.ring_volume)
-            print(f"Ring sound loaded from {ring_path}")
+            try:
+                self.ring_sound = pygame.mixer.Sound(ring_path)
+                self.ring_sound.set_volume(self.ring_volume)
+                print(f"Ring sound loaded from {ring_path}")
+            except Exception as e:
+                print(f"Error loading ring sound: {e}")
         else:
             print(f"Ring sound not found at {ring_path}")
 
