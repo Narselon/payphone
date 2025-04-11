@@ -7,6 +7,8 @@ import os
 import time  # Add this import
 from keypad import GPIO_AVAILABLE
 #import keyboard  # Add this import at top
+import subprocess
+from typing import Optional
 
 # Pin definitions
 LIGHT_PIN = 25  # Choose an unused GPIO pin
@@ -28,20 +30,49 @@ class PayPhone:
         self.last_ring_time = time.time()
         self.ring_volume = 1.0
         self.debug_mode = True
+
+        # Setup PulseAudio
+        self._setup_pulseaudio()
         
-        # Initialize AUX mixer for ringing
-        try:
-            pygame.mixer.quit()
-            pygame.mixer.pre_init(44100, -16, 2, 2048)
-            pygame.mixer.init(devicename="bcm2835_Headphones")
-            print("Initialized AUX audio")
-        except pygame.error as e:
-            print(f"Error initializing AUX audio: {e}")
-            
+        # Initialize mixer for AUX
+        self._init_mixer()
+        
         self.load_sounds()
         self.ring_thread = threading.Thread(target=self._random_ring_controller, daemon=True)
         self.ring_thread.start()
         print("Debug mode active - Press 'r' key to test ring")
+
+    def _setup_pulseaudio(self):
+        """Setup PulseAudio configuration"""
+        try:
+            # Get PulseAudio socket path
+            pulseaudio_socket = os.path.join(os.environ.get('XDG_RUNTIME_DIR', '/run/user/1000'), 'pulse', 'native')
+            os.environ['PULSE_SERVER'] = f'unix:{pulseaudio_socket}'
+            
+            # Switch to AUX output
+            self._switch_audio_output('alsa_output.platform-bcm2835_audio.stereo-fallback')
+            print("PulseAudio configured for AUX output")
+        except Exception as e:
+            print(f"PulseAudio setup error: {e}")
+
+    def _switch_audio_output(self, sink_name: str) -> None:
+        """Switch PulseAudio output device"""
+        try:
+            time.sleep(0.5)  # Allow audio system to stabilize
+            subprocess.run(["pactl", "set-default-sink", sink_name], check=True)
+            print(f"Switched audio to {sink_name}")
+        except subprocess.CalledProcessError as e:
+            print(f"Error switching audio output: {e}")
+
+    def _init_mixer(self):
+        """Initialize pygame mixer"""
+        try:
+            pygame.mixer.quit()
+            pygame.mixer.pre_init(44100, -16, 2, 2048)
+            pygame.mixer.init()
+            print("Mixer initialized successfully")
+        except Exception as e:
+            print(f"Mixer initialization error: {e}")
 
     def load_sounds(self):
         """Load the ring sound file"""
