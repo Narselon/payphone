@@ -24,6 +24,10 @@ pygame.mixer.init(devicename="hw:0,0")  # Use default audio device (aux)
 
 class PayPhone:
     def __init__(self, audio_dir="sounds"):
+        # Define audio device names from pactl output
+        self.AIY_DEVICE = "alsa_output.platform-3f00b840.mailbox.stereo-fallback"
+        self.AUX_DEVICE = "alsa_output.platform-soc_sound.stereo-fallback"
+        
         self.audio_dir = audio_dir
         self.ring_sound = None
         self.adventure_active = False
@@ -45,24 +49,29 @@ class PayPhone:
     def _setup_pulseaudio(self):
         """Setup PulseAudio configuration"""
         try:
-            # Get PulseAudio socket path
-            pulseaudio_socket = os.path.join(os.environ.get('XDG_RUNTIME_DIR', '/run/user/1000'), 'pulse', 'native')
-            os.environ['PULSE_SERVER'] = f'unix:{pulseaudio_socket}'
-            
-            # Switch to AUX output
-            self._switch_audio_output('alsa_output.platform-bcm2835_audio.stereo-fallback')
-            print("PulseAudio configured for AUX output")
+            # Switch to AUX by default
+            self._switch_audio_output(self.AUX_DEVICE)
+            print(f"Initial audio setup: {self.AUX_DEVICE}")
         except Exception as e:
             print(f"PulseAudio setup error: {e}")
 
     def _switch_audio_output(self, sink_name: str) -> None:
         """Switch PulseAudio output device"""
         try:
-            time.sleep(0.5)  # Allow audio system to stabilize
-            subprocess.run(["pactl", "set-default-sink", sink_name], check=True)
-            print(f"Switched audio to {sink_name}")
-        except subprocess.CalledProcessError as e:
-            print(f"Error switching audio output: {e}")
+            time.sleep(0.5)
+            result = subprocess.run(
+                ["pactl", "set-default-sink", sink_name],
+                check=False,  # Don't raise exception
+                capture_output=True,
+                text=True
+            )
+            if result.returncode == 0:
+                print(f"Switched audio to {sink_name}")
+            else:
+                print(f"Error switching to {sink_name}: {result.stderr}")
+                
+        except Exception as e:
+            print(f"Error in audio switch: {e}")
 
     def _init_mixer(self):
         """Initialize pygame mixer"""
@@ -135,28 +144,14 @@ class PayPhone:
         """Switch to AIY speaker when adventure starts"""
         self.adventure_active = True
         self.set_light(GPIO.HIGH)
-        # Switch to AIY audio
-        try:
-            pygame.mixer.quit()
-            pygame.mixer.pre_init(44100, -16, 2, 2048)
-            pygame.mixer.init()  # Default device (AIY)
-            print("Switched to AIY audio")
-        except pygame.error as e:
-            print(f"Error switching to AIY audio: {e}")
+        self._switch_audio_output(self.AIY_DEVICE)
 
     def stop_adventure(self):
         """Switch back to AUX for ringing"""
         self.adventure_active = False
         self.set_light(GPIO.LOW)
-        # Switch back to AUX
-        try:
-            pygame.mixer.quit()
-            pygame.mixer.pre_init(44100, -16, 2, 2048)
-            pygame.mixer.init(devicename="bcm2835_Headphones")
-            print("Switched back to AUX audio")
-            self.load_sounds()  # Reload sounds for ring audio
-        except pygame.error as e:
-            print(f"Error switching to AUX audio: {e}")
+        self._switch_audio_output(self.AUX_DEVICE)
+        self.load_sounds()
 
 # Create a global instance
 payphone = PayPhone()
