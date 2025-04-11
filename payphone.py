@@ -25,8 +25,8 @@ pygame.mixer.init(devicename="hw:0,0")  # Use default audio device (aux)
 class PayPhone:
     def __init__(self, audio_dir="sounds"):
         # Define audio device names from pactl output
-        self.AIY_DEVICE = "alsa_output.platform-3f00b840.mailbox.stereo-fallback"
-        self.AUX_DEVICE = "alsa_output.platform-soc_sound.stereo-fallback"
+        self.AUX_DEVICE = "alsa_output.platform-3f00b840.mailbox.stereo-fallback"
+        self.AIY_DEVICE = "alsa_output.platform-soc_sound.stereo-fallback"
         
         self.audio_dir = audio_dir
         self.ring_sound = None
