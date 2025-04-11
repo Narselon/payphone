@@ -29,26 +29,16 @@ class PayPhone:
         self.ring_volume = 1.0
         self.debug_mode = True
         
-        # Initialize mixer for ring audio
+        # Initialize AUX mixer for ringing
         try:
-            # Try hardware device first
             pygame.mixer.quit()
             pygame.mixer.pre_init(44100, -16, 2, 2048)
-            pygame.mixer.init(devicename="hw:0,0")
-            print("Initialized audio with hw:0,0")
-        except pygame.error:
-            try:
-                # Fallback to default device
-                pygame.mixer.quit()
-                pygame.mixer.pre_init(44100, -16, 2, 2048)
-                pygame.mixer.init()
-                print("Initialized audio with default device")
-            except Exception as e:
-                print(f"Critical audio initialization error: {e}")
-        
+            pygame.mixer.init(devicename="bcm2835_Headphones")
+            print("Initialized AUX audio")
+        except pygame.error as e:
+            print(f"Error initializing AUX audio: {e}")
+            
         self.load_sounds()
-        
-        # Start ring thread
         self.ring_thread = threading.Thread(target=self._random_ring_controller, daemon=True)
         self.ring_thread.start()
         print("Debug mode active - Press 'r' key to test ring")
@@ -111,14 +101,31 @@ class PayPhone:
             self.play_ring()
 
     def start_adventure(self):
-        """Called when starting the adventure"""
+        """Switch to AIY speaker when adventure starts"""
         self.adventure_active = True
         self.set_light(GPIO.HIGH)
+        # Switch to AIY audio
+        try:
+            pygame.mixer.quit()
+            pygame.mixer.pre_init(44100, -16, 2, 2048)
+            pygame.mixer.init()  # Default device (AIY)
+            print("Switched to AIY audio")
+        except pygame.error as e:
+            print(f"Error switching to AIY audio: {e}")
 
     def stop_adventure(self):
-        """Called when ending the adventure"""
+        """Switch back to AUX for ringing"""
         self.adventure_active = False
         self.set_light(GPIO.LOW)
+        # Switch back to AUX
+        try:
+            pygame.mixer.quit()
+            pygame.mixer.pre_init(44100, -16, 2, 2048)
+            pygame.mixer.init(devicename="bcm2835_Headphones")
+            print("Switched back to AUX audio")
+            self.load_sounds()  # Reload sounds for ring audio
+        except pygame.error as e:
+            print(f"Error switching to AUX audio: {e}")
 
 # Create a global instance
 payphone = PayPhone()
