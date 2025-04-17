@@ -62,6 +62,24 @@ KEYPAD_SOUNDS = {
     "r": "ring.mp3",  # Add ring test mapping
 }
 
+def play_keypad_sound(key):
+    """Play sound associated with keypad press"""
+    try:
+        # Get sound file name for the key
+        sound_file = KEYPAD_SOUNDS.get(key, KEYPAD_SOUNDS["default"])
+        sound_path = os.path.join(SOUND_DIRECTORY, sound_file)
+        
+        if os.path.exists(sound_path):
+            sound = pygame.mixer.Sound(sound_path)
+            sound.play()
+            time.sleep(0.1)  # Short delay to prevent sound overlap
+            print(f"Playing sound for key: {key}")
+        else:
+            print(f"Sound file not found: {sound_path}")
+            
+    except Exception as e:
+        print(f"Error playing keypad sound: {e}")
+
 # Global variables for input handling
 keyboard_input = None
 input_ready = threading.Event()
