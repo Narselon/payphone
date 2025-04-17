@@ -144,10 +144,12 @@ def is_phone_lifted():
 
 def keyboard_input_thread():
     """Thread function to handle keyboard input."""
-    global keyboard_input, _should_stop
+    global keyboard_input, _should_stop, last_keypress_time
     
     try:
         while not _should_stop:
+            current_time = time.time()
+            
             # Check GPIO keypad first if available
             if GPIO_AVAILABLE:
                 # Check each column
@@ -158,21 +160,26 @@ def keyboard_input_thread():
                     # Check each row
                     for row_num, row_pin in enumerate(ROWS):
                         if GPIO.input(row_pin) == GPIO.LOW:  # Key pressed
+                            # Debounce check
+                            if current_time - last_keypress_time < KEYPRESS_DELAY:
+                                continue
+                                
                             keyboard_input = KEYPAD_MAPPING[row_num][col_num]
-                            print(f"Keypad press detected: {keyboard_input}")  # Debug output
-                            play_keypad_sound(keyboard_input)  # Play sound
-                            input_ready.set()  # Signal input ready
+                            print(f"Keypad press detected: {keyboard_input}")
+                            play_keypad_sound(keyboard_input)
+                            input_ready.set()
+                            last_keypress_time = current_time
                             
-                            # Wait for key release and reset column
+                            # Wait for key release
                             while GPIO.input(row_pin) == GPIO.LOW:
-                                time.sleep(0.01)
-                            GPIO.output(col_pin, GPIO.HIGH)
+                                time.sleep(0.05)  # Longer delay during key hold
                             
-                            # Important: Return here after handling keypress
+                            GPIO.output(col_pin, GPIO.HIGH)
+                            time.sleep(0.2)  # Delay after key release
                             return
                             
-                    GPIO.output(col_pin, GPIO.HIGH)  # Reset column if no press
-                time.sleep(0.01)  # Small delay between matrix scans
+                    GPIO.output(col_pin, GPIO.HIGH)
+                time.sleep(0.01)
                     
             else:
                 # Fallback to keyboard input if no GPIO
