@@ -162,6 +162,7 @@ def keyboard_input_thread():
                         if GPIO.input(row_pin) == GPIO.LOW:  # Key pressed
                             # Debounce check
                             if current_time - last_keypress_time < KEYPRESS_DELAY:
+                                GPIO.output(col_pin, GPIO.HIGH)
                                 continue
                                 
                             keyboard_input = KEYPAD_MAPPING[row_num][col_num]
@@ -172,11 +173,14 @@ def keyboard_input_thread():
                             
                             # Wait for key release
                             while GPIO.input(row_pin) == GPIO.LOW:
-                                time.sleep(0.05)  # Longer delay during key hold
+                                time.sleep(0.05)
                             
                             GPIO.output(col_pin, GPIO.HIGH)
                             time.sleep(0.2)  # Delay after key release
-                            return
+                            
+                            # Clear input ready for next press
+                            input_ready.clear()
+                            continue  # Continue scanning instead of returning
                             
                     GPIO.output(col_pin, GPIO.HIGH)
                 time.sleep(0.01)
