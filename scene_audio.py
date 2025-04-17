@@ -64,11 +64,7 @@ class SceneAudio:
             # Special scenes that skip beep
             skip_beep_scenes = ['intro', 'no_numbers_scene']
             
-            # Play key beep unless in skip list
-            if scene_id not in skip_beep_scenes:
-                self.play_key_beep()
-                
-            # Load and play scene audio
+            # Load and play scene audio - removed beep here since keypad already plays it
             audio_path = os.path.join(self.audio_dir, f"{scene_id}.mp3")
             if os.path.exists(audio_path):
                 scene_sound = pygame.mixer.Sound(audio_path)
