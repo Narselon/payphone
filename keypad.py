@@ -153,28 +153,29 @@ def keyboard_input_thread():
                 # Check each column
                 for col_num, col_pin in enumerate(COLS):
                     GPIO.output(col_pin, GPIO.LOW)  # Set column low
+                    time.sleep(0.01)  # Add delay for GPIO to settle
                     
                     # Check each row
                     for row_num, row_pin in enumerate(ROWS):
                         if GPIO.input(row_pin) == GPIO.LOW:  # Key pressed
                             keyboard_input = KEYPAD_MAPPING[row_num][col_num]
+                            print(f"Keypad press detected: {keyboard_input}")  # Debug output
                             play_keypad_sound(keyboard_input)  # Play sound
                             input_ready.set()  # Signal input ready
+                            
+                            # Wait for key release
+                            while GPIO.input(row_pin) == GPIO.LOW:
+                                time.sleep(0.01)
+                                
                             GPIO.output(col_pin, GPIO.HIGH)  # Reset column
-                            return  # Exit after handling keypress
+                            time.sleep(0.1)  # Debounce delay
+                            return
                             
                     GPIO.output(col_pin, GPIO.HIGH)  # Reset column
                     
             # Fallback to keyboard input if no GPIO
             keyboard_input = input().strip().lower()
             if keyboard_input:
-                # Handle ring test
-                if keyboard_input == 'r':
-                    from payphone import payphone
-                    payphone.play_ring()
-                    continue
-                    
-                # Handle regular keypad input    
                 if len(keyboard_input) == 1:
                     if keyboard_input in KEYPAD_SOUNDS:
                         play_keypad_sound(keyboard_input)
