@@ -163,27 +163,26 @@ def keyboard_input_thread():
                             play_keypad_sound(keyboard_input)  # Play sound
                             input_ready.set()  # Signal input ready
                             
-                            # Wait for key release
+                            # Wait for key release and reset column
                             while GPIO.input(row_pin) == GPIO.LOW:
                                 time.sleep(0.01)
-                                
-                            GPIO.output(col_pin, GPIO.HIGH)  # Reset column
-                            time.sleep(0.1)  # Debounce delay
+                            GPIO.output(col_pin, GPIO.HIGH)
+                            
+                            # Important: Return here after handling keypress
                             return
                             
-                    GPIO.output(col_pin, GPIO.HIGH)  # Reset column
+                    GPIO.output(col_pin, GPIO.HIGH)  # Reset column if no press
+                time.sleep(0.01)  # Small delay between matrix scans
                     
-            # Fallback to keyboard input if no GPIO
-            keyboard_input = input().strip().lower()
-            if keyboard_input:
-                if len(keyboard_input) == 1:
+            else:
+                # Fallback to keyboard input if no GPIO
+                keyboard_input = input().strip().lower()
+                if keyboard_input and len(keyboard_input) == 1:
                     if keyboard_input in KEYPAD_SOUNDS:
                         play_keypad_sound(keyboard_input)
                     input_ready.set()
                     break
                     
-            time.sleep(0.01)  # Small delay to prevent CPU hogging
-            
     except (EOFError, KeyboardInterrupt):
         _should_stop = True
 
