@@ -148,6 +148,24 @@ def keyboard_input_thread():
     
     try:
         while not _should_stop:
+            # Check GPIO keypad first if available
+            if GPIO_AVAILABLE:
+                # Check each column
+                for col_num, col_pin in enumerate(COLS):
+                    GPIO.output(col_pin, GPIO.LOW)  # Set column low
+                    
+                    # Check each row
+                    for row_num, row_pin in enumerate(ROWS):
+                        if GPIO.input(row_pin) == GPIO.LOW:  # Key pressed
+                            keyboard_input = KEYPAD_MAPPING[row_num][col_num]
+                            play_keypad_sound(keyboard_input)  # Play sound
+                            input_ready.set()  # Signal input ready
+                            GPIO.output(col_pin, GPIO.HIGH)  # Reset column
+                            return  # Exit after handling keypress
+                            
+                    GPIO.output(col_pin, GPIO.HIGH)  # Reset column
+                    
+            # Fallback to keyboard input if no GPIO
             keyboard_input = input().strip().lower()
             if keyboard_input:
                 # Handle ring test
@@ -159,9 +177,12 @@ def keyboard_input_thread():
                 # Handle regular keypad input    
                 if len(keyboard_input) == 1:
                     if keyboard_input in KEYPAD_SOUNDS:
-                        play_keypad_sound(keyboard_input)  # Play sound first
-                    input_ready.set()  # Then signal input is ready
-                    break  # Exit loop after handling input
+                        play_keypad_sound(keyboard_input)
+                    input_ready.set()
+                    break
+                    
+            time.sleep(0.01)  # Small delay to prevent CPU hogging
+            
     except (EOFError, KeyboardInterrupt):
         _should_stop = True
 
