@@ -5,6 +5,7 @@ import pygame  # For playing MP3 sounds
 import atexit
 from threading import Lock
 from threading import Event
+import os
 
 try:
     import RPi.GPIO as GPIO
@@ -142,6 +143,7 @@ def is_phone_lifted():
     return not phone_on_hook
 
 def keyboard_input_thread():
+    """Thread function to handle keyboard input."""
     global keyboard_input, _should_stop
     
     try:
@@ -157,9 +159,9 @@ def keyboard_input_thread():
                 # Handle regular keypad input    
                 if len(keyboard_input) == 1:
                     if keyboard_input in KEYPAD_SOUNDS:
-                        play_keypad_sound(keyboard_input)
-                input_ready.set()
-                break
+                        play_keypad_sound(keyboard_input)  # Play sound first
+                    input_ready.set()  # Then signal input is ready
+                    break  # Exit loop after handling input
     except (EOFError, KeyboardInterrupt):
         _should_stop = True
 
