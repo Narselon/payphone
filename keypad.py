@@ -144,3 +144,61 @@ def keyboard_input_thread():
                 break
     except (EOFError, KeyboardInterrupt):
         _should_stop = True
+
+# Add these new functions
+
+def wait_for_single_keypress():
+    """Wait for a single keypress and return it."""
+    global keyboard_input, input_ready, _input_thread
+    
+    with _input_thread_lock:
+        # Reset states
+        keyboard_input = None
+        input_ready.clear()
+        
+        # Start new input thread if needed
+        if not _input_thread or not _input_thread.is_alive():
+            _input_thread = threading.Thread(target=keyboard_input_thread)
+            _input_thread.daemon = True
+            _input_thread.start()
+    
+    # Wait for input
+    input_ready.wait()
+    return keyboard_input
+
+def wait_for_keypress():
+    """Wait for keypress and handle special inputs."""
+    global CODE_ENTRY_MODE, input_buffer
+    
+    while True:
+        key = wait_for_single_keypress()
+        
+        # Handle None/invalid input
+        if key is None:
+            return None
+            
+        # Handle code entry mode
+        if CODE_ENTRY_MODE:
+            if key == '#':
+                # End code entry
+                CODE_ENTRY_MODE = False
+                code = input_buffer
+                input_buffer = ""
+                return code
+            elif key == '*':
+                # Cancel code entry
+                CODE_ENTRY_MODE = False
+                input_buffer = ""
+                continue
+            else:
+                # Add to code buffer
+                input_buffer += key
+                continue
+                
+        # Start code entry mode
+        if key == '*':
+            CODE_ENTRY_MODE = True
+            input_buffer = ""
+            continue
+            
+        return key
