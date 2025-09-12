@@ -1,0 +1,8 @@
+id: "turn over book"
+text: "You meta burn"
+connections: {}
+hidden_connections:
+  "0": "hub"
+  "skip": "scene3"
+items_granted: []
+items_required: []

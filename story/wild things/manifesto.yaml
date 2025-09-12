@@ -1,0 +1,13 @@
+id: "manifesto"
+text: "1 run. 2 magic trick"
+connections:
+  1: ["Run away", {
+    "sand": "run2sand",
+    "default": "run2"
+  }]
+  2: ["Use magic trick", "magic trick", []]
+hidden_connections:
+  "0": "hub"
+  "skip": "scene3"
+items_granted: []
+items_required: []

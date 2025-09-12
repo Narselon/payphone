@@ -1,0 +1,17 @@
+id: "intro2"
+text: "What'd you say? I didn't quite get that. I'm a little frazzled myself. They literally told me not to get any more patrons stuck in the phone. Y'know what would calm us down? Some relaxing music. Let's see what I can find. Ah, banned books. Press any number except for zero and we'll be on our way. to"
+connections:
+  1: ["Proceed", "intro3", []]
+  2: ["Proceed", "intro3", []]
+  3: ["Proceed", "intro3", []]
+  4: ["Proceed", "intro3", []]
+  5: ["Proceed", "intro3", []]
+  6: ["Proceed", "intro3", []]
+  7: ["Proceed", "intro3", []]
+  8: ["Proceed", "intro3", []]
+  9: ["Proceed", "intro3", []]
+hidden_connections:
+  "0": "hub"
+  "skip": "scene3"
+items_granted: []
+items_required: []

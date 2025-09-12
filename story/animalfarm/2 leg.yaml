@@ -1,0 +1,8 @@
+id: "2 leg"
+text: "same as humans"
+connections: {}
+hidden_connections:
+  "0": "hub"
+  "skip": "scene3"
+items_granted: []
+items_required: []

@@ -1,0 +1,17 @@
+id: "pinchfield"
+text: "number of legs"
+connections:
+  1: ["1 leg", "1 leg", []]
+  2: ["2 leg", "2 leg", []]
+  3: ["3 leg", "3 leg", []]
+  4: ["4 leg", "4 leg", []]
+  5: ["5 leg", "5 leg", []]
+  6: ["6 leg", "6 leg", []]
+  7: ["7 leg", "7 leg", []]
+  8: ["8 leg", "8 leg", []]
+  9: ["9 leg", "9 leg", []]
+hidden_connections:
+  "0": "hub"
+  "skip": "scene3"
+items_granted: []
+items_required: []

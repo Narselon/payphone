@@ -1,10 +1,17 @@
 id: "intro"
-text: "You wake up in a dark room. The phone in your hand is your only connection to the outside world.\n1. Jump in the pit.\n2. Call your uncle"
+text: "Oh no. You answered the phone? You weren't supposed to do that. This payphone was developed by the brilliant Dr. Stori to transport visitors into the world of fiction Sounds great, doesn't it? Well, he hasn't gotten around to figuring out a way to make you uh..'non-fiction'. We lost a lot of good test subjects. Mostly librarians. You can ask the reference desk about them. Or you could if you weren't stuck here. There was supposed to be a sign, but y'know..OSHA. Fear not I have a manual. On a scale of 1-9 how alarmed are you with 9 being get me out of this thing and 1 is 'oh, not again.'?"
 connections:
-  1: ["Jump in the pit", "scene1", []]
-  2: ["Call your uncle", "scene2", ["phone_number"]]
+  1: ["Proceed", "intro2", []]
+  2: ["Proceed", "intro2", []]
+  3: ["Proceed", "intro2", []]
+  4: ["Proceed", "intro2", []]
+  5: ["Proceed", "intro2", []]
+  6: ["Proceed", "intro2", []]
+  7: ["Proceed", "intro2", []]
+  8: ["Proceed", "intro2", []]
+  9: ["Proceed", "intro2", []]
 hidden_connections:
-  "042": "secret_scene"
+  "0": "hub"
   "skip": "scene3"
-items_granted: ["flashlight"]
+items_granted: []
 items_required: []

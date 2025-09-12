@@ -1,0 +1,10 @@
+id: "napoleon"
+text: "speak up or do nothing"
+connections:
+  1: ["speak up", "speak up", []]
+  2: ["do nothing", "do nothing", []]
+hidden_connections:
+  "0": "hub"
+  "skip": "scene3"
+items_granted: []
+items_required: []
