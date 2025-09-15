@@ -2,7 +2,8 @@ id: "run2sand"
 text: "escape with sand"
 connections: {}
 hidden_connections:
-  "0": "hub"
-  "skip": "scene3"
-items_granted: []
-items_required: [sand]
+  "timeout": "hub"
+  "default": "hub"
+items_granted: ["sand"]
+items_required: ["sand"]
+timeout_after_audio: true 

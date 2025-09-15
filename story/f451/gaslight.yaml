@@ -1,5 +1,5 @@
 id: "gaslight"
-text: "Nothing? What do take me for?" He taps his earpiece. "Send over the Mechanical Hound. Mechanical hounds! I told you it was the future! What's a Boston Dynamics? A large dog-like robot with 6 legs scurries over and begins to sniff you. As it moves around you, you notice a keypad. Perhaps with the right code it can be overidden."
+text: "Nothing? What do take me for? He taps his earpiece. Send over the Mechanical Hound. Mechanical hounds! I told you it was the future! What's a Boston Dynamics? A large dog-like robot with 6 legs scurries over and begins to sniff you. As it moves around you, you notice a keypad. Perhaps with the right code it can be overidden."
 connections: {}
 hidden_connections:
   "0": "hub"

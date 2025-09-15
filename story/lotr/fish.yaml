@@ -1,9 +1,9 @@
-id: "shakespeare"
-text: "Eliminated"
+id: "clocks"
+text: "another riddle"
 connections: {}
 hidden_connections:
-  "timeout": "hub"
-  "default": "hub"
+  "timeout": "barrel"
+  "default": "barrel"
 items_granted: []
 items_required: []
 timeout_after_audio: true 

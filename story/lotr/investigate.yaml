@@ -1,9 +1,10 @@
-id: "speak up"
-text: "interloper"
+id: "investigate"
+text: "to throw a rock"
 connections: {}
 hidden_connections:
-  "timeout": "hub"
-  "default": "hub"
+  "0": "hub"
+  "timeout": "throw rock"
+  "default": "stop rock"
 items_granted: []
 items_required: []
 timeout_after_audio: true  # Add this flag

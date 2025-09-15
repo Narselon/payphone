@@ -1,0 +1,10 @@
+id: "throw rock"
+text: "throw 2nd rock, lie about fish, run"
+connections: 
+  1: ["throw 2nd rock", "throw 2nd rock", []]
+  2: ["fish lie", "fish lie", []]
+  3: ["gollum run", "gollum run", []]
+hidden_connections:
+  "0": "hub"
+items_granted: []
+items_required: []

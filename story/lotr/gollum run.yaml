@@ -1,9 +1,9 @@
-id: "shakespeare"
-text: "Eliminated"
+id: "gollum run"
+text: "try running find orcs"
 connections: {}
 hidden_connections:
-  "timeout": "hub"
-  "default": "hub"
+  "timeout": "orcs"
+  "default": "orcs"
 items_granted: []
 items_required: []
 timeout_after_audio: true 
