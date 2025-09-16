@@ -1,10 +1,10 @@
 id: "hub"
 text: "You're back. Press 1 to enter Farhenheit 451. 2 for Lord of the Rings. 3 for Animal Farm. 4 for Where the Wild Things Are. Or enter the code to assemble the plot device. You may press 0 at any time to return here at any time."
 connections:
-  1: ["Fahrenheit 451", "Fahrenheit 451", []]
-  2: ["Lord of the Rings", "Lord of the Rings", []]
-  3: ["Animal Farm", "Animal Farm", []]
-  4: ["Where the Wild Things Are", "Where the Wild Things Are", []]
+  1: ["Fahrenheit_451", "Fahrenheit_451", []]
+  2: ["Lord_of_the-Rings", "Lord_of_the_Rings", []]
+  3: ["Animal_Farm", "Animal_Farm", []]
+  4: ["Where_the_Wild_Things_Are", "Where_the_Wild_Things_Are", []]
 hidden_connections:
   "0": "hub"
   "skip": "scene3"
