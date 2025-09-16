@@ -1,0 +1,9 @@
+id: "not numbers"
+text: "fingers"
+connections: {}
+hidden_connections:
+  "#": "not numbers"
+  "*": "not numbers"
+  "default": "fingers"
+items_granted: []
+items_required: []

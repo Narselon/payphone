@@ -1,0 +1,9 @@
+id: "reason"
+text: "not the time for reason"
+connections: {}
+hidden_connections:
+  "#": "not numbers"
+  "*": "not numbers"
+  "default": "fingers"
+items_granted: []
+items_required: []

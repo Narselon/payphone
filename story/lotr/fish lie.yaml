@@ -1,0 +1,9 @@
+id: "fish lie"
+text: "toss 2nd rock or buy time"
+connections: 
+  2: ["throw 2nd rock", "throw 2nd rock", []]
+  3: ["buy time", "buy time", []]
+hidden_connections:
+  "0": "hub"
+items_granted: []
+items_required: []

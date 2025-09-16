@@ -1,9 +1,9 @@
-id: "fish"
-text: "another riddle"
+id: "animals"
+text: "lost with rabbits"
 connections: {}
 hidden_connections:
-  "timeout": "barrel"
-  "default": "barrel"
+  "timeout": "hub"
+  "default": "hub"
 items_granted: []
 items_required: []
 timeout_after_audio: true 
