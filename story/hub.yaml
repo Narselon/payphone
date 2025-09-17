@@ -10,7 +10,7 @@ hidden_connections:
   "skip": "scene3"
   "timeout": {
     "ring,wild,451,full_tummy": "plotdevice",  
-    "ring,wild,451,full_tummy, sand": "plotdevice_sand"      
+    "ring,wild,451,full_tummy,sand": "plotdevice_sand"      
   }
 items_granted: []
 items_required: []
