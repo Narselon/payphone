@@ -1,7 +1,7 @@
 id: "adventure"
 text: "1 stand tall. 2 run"
 connections:
-  1: ["stand tall", "stand tall", []]
+  1: ["stand_tall", "stand_tall", []]
   2: ["Use sand", {
     "sand": "runsand",
     "default": "run"

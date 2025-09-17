@@ -8,5 +8,9 @@ connections:
 hidden_connections:
   "0": "hub"
   "skip": "scene3"
+  "timeout": {
+    "ring,wild,451,full_tummy": "plotdevice",  
+    "ring,wild,451,full_tummy, sand": "plotdevice_sand"      
+  }
 items_granted: []
 items_required: []

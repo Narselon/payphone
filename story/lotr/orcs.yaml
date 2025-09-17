@@ -2,7 +2,7 @@ id: "orcs"
 text: "orcs hide or help"
 connections:
   1: ["hide", "hide", []]
-  2: ["lend a hand", "lend a hand", []] 
+  2: ["lend_a_hand", "lend_a_hand", []] 
 hidden_connections:
   "0": "hub"
 items_granted: []

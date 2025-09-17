@@ -2,7 +2,7 @@ id: "climb tree"
 text: "on tree jump or climb down"
 connections: 
   2: ["jump", "jump", []]
-  8: ["climb down", "climb down", []]
+  8: ["climb_down", "climb_down", []]
 hidden_connections:
   "0": "hub"
 items_granted: []
