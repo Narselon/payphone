@@ -1,4 +1,4 @@
-id: "magic trick"
+id: "magic_trick"
 text: "1 rumpus. 2 homework"
 connections:
   1: ["rumpus", "rumpus", []]

@@ -1,4 +1,4 @@
-id: "stand tall"
+id: "stand_tall"
 text: "1 rumpus. 2 manifesto"
 connections:
   1: ["rumpus", "rumpus", []]

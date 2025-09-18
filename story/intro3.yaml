@@ -7,6 +7,33 @@ connections:
   4: ["Where_the_Wild_Things_Are", "Where_the_Wild_Things_Are", []]
 hidden_connections:
   "0": "hub"
-  "skip": "scene3"
+  "451746494533255": "plotdevice"
+  "451746432559453": "plotdevice"
+  "451945374643255": "plotdevice"
+  "451945332557464": "plotdevice"
+  "451325574649453": "plotdevice"
+  "451325594537464": "plotdevice"
+  "746445194533255": "plotdevice"
+  "746445132559453": "plotdevice"
+  "746494534513255": "plotdevice"
+  "746494533255451": "plotdevice"
+  "746432554519453": "plotdevice"
+  "746432559453451": "plotdevice"
+  "945345174643255": "plotdevice"
+  "945345132557464": "plotdevice"
+  "945374644513255": "plotdevice"
+  "945374643255451": "plotdevice"
+  "945332554517464": "plotdevice"
+  "945332557464451": "plotdevice"
+  "325545174649453": "plotdevice"
+  "325545194537464": "plotdevice"
+  "325574644519453": "plotdevice"
+  "325574649453451": "plotdevice"
+  "325594534517464": "plotdevice"
+  "325594537464451": "plotdevice"
+  "timeout": {
+    "ring,wild,451,full_tummy": "plotdevice",  
+    "ring,wild,451,full_tummy,sand": "plotdevice_sand"      
+  }
 items_granted: []
 items_required: []

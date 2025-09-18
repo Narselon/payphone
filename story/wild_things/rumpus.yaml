@@ -1,13 +1,12 @@
 id: "rumpus"
-text: "1 stop rumpus. 2 party"
+text: "1. Stop rumpus. 2. Join party"
 connections:
-  1: ["stop rumpus", {
+  1: ["Stop rumpus", {
     "sand": "stop_rumpusand",
     "default": "stop_rumpus"
   }]
-  2: ["party", "party", []]
+  2: ["Join party", "party", []]
 hidden_connections:
   "0": "hub"
-  "skip": "scene3"
 items_granted: []
 items_required: []
