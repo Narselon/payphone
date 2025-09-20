@@ -30,15 +30,22 @@ class Scene:
         Determine the next scene based on choice and inventory items.
         Supports multiple branching paths based on specific items.
         """
-        # Check if the choice is a special hidden connection
+        print(f"DEBUG: get_next_scene called with choice='{choice}', connections={self.connections}")
+        
+        # Check if the choice is a special hidden connection (like timeout)
         if choice in self.hidden_connections:
+            print(f"DEBUG: Found hidden connection for '{choice}' -> '{self.hidden_connections[choice]}'")
             return self.hidden_connections[choice], None
 
         # Check if it's a regular numbered choice
         try:
             choice_index = int(choice)
+            print(f"DEBUG: Converted choice to int: {choice_index}")
+            
             if choice_index in self.connections:
+                print(f"DEBUG: Found connection for choice {choice_index}")
                 connection_data = self.connections[choice_index]
+                print(f"DEBUG: Connection data: {connection_data}")
                 option_text = connection_data[0]
                 
                 # Handle standard format: [text, target, required_items, alt_scene]
@@ -47,14 +54,18 @@ class Scene:
                     required_items = connection_data[2] if len(connection_data) > 2 else []
                     alt_scene_id = connection_data[3] if len(connection_data) > 3 else None
                     
+                    print(f"DEBUG: Standard format - target: {target_scene_id}, required: {required_items}")
+                    
                     # Special case for calling without a phone number
                     if target_scene_id == "scene2" and "phone_number" not in inventory:
                         return "no_numbers_scene", None
                     
                     # Check if player has all required items
                     if all(item in inventory for item in required_items):
+                        print(f"DEBUG: All required items present, going to: {target_scene_id}")
                         return target_scene_id, None
                     elif alt_scene_id:
+                        print(f"DEBUG: Missing items, going to alt scene: {alt_scene_id}")
                         return alt_scene_id, None
                     else:
                         missing_items = [item for item in required_items if item not in inventory]
@@ -64,20 +75,33 @@ class Scene:
                 # Handle advanced branching: [text, {item1: scene1, item2: scene2, ..., "default": default_scene}]
                 elif len(connection_data) >= 2 and isinstance(connection_data[1], dict):
                     paths = connection_data[1]
+                    print(f"DEBUG: Advanced branching format - paths: {paths}")
                     
                     # First check for specific items in inventory that have defined paths
                     for item, scene_id in paths.items():
                         if item in inventory and item != "default":
+                            print(f"DEBUG: Found matching item '{item}', going to: {scene_id}")
                             return scene_id, None
                     
                     # If no matching item, use the default path if provided
                     if "default" in paths:
+                        print(f"DEBUG: Using default path: {paths['default']}")
                         return paths["default"], None
                     else:
                         return None, "You don't have the right item for this action."
+            else:
+                print(f"DEBUG: Choice {choice_index} not found in connections")
+                
         except ValueError:
+            print(f"DEBUG: Choice '{choice}' is not a valid integer")
             pass  # Ignore non-integer choices (except for hidden ones)
+        
+        # If we get here, check if there's a default action for any button press
+        if "default" in self.hidden_connections:
+            print(f"DEBUG: Using default hidden connection: {self.hidden_connections['default']}")
+            return self.hidden_connections["default"], None
             
+        print("DEBUG: No valid choice found, returning invalid choice message")
         return None, "Invalid choice. Try again."
 
 
@@ -188,14 +212,34 @@ def handle_timed_input(scene, scene_audio):
     start_time = time.time()
     print(f"DEBUG: Timeout started at {start_time}")
     
-    while time.time() - start_time < timeout_seconds:
-        choice = keypad.wait_for_single_keypress()
-        if choice:
-            print(f"DEBUG: User pressed '{choice}' before timeout")
-            return choice
-        
-        # Add a small sleep to prevent busy waiting
+    # Use threading to handle the timeout properly
+    import threading
+    choice_result = [None]  # Use list to allow modification in nested function
+    
+    def get_input():
+        try:
+            choice = keypad.wait_for_single_keypress()
+            if choice:
+                choice_result[0] = choice
+                print(f"DEBUG: User pressed '{choice}' before timeout")
+        except Exception as e:
+            print(f"DEBUG: Error getting input: {e}")
+    
+    # Start input thread
+    input_thread = threading.Thread(target=get_input, daemon=True)
+    input_thread.start()
+    
+    # Wait for either timeout or input
+    elapsed = 0
+    while elapsed < timeout_seconds:
+        if choice_result[0] is not None:
+            return choice_result[0]
         time.sleep(0.1)
+        elapsed = time.time() - start_time
+        
+        # Debug progress every second
+        if int(elapsed) != int(elapsed - 0.1):
+            print(f"DEBUG: Timeout progress: {elapsed:.1f}/{timeout_seconds}s")
     
     print("DEBUG: Timeout reached, returning 'timeout'")
     return "timeout"
