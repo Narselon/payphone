@@ -2,8 +2,8 @@ id: "wrong_code"
 text: "You get bit"
 connections: {}
 hidden_connections:
-  "timeout": "hub"
-  "default": "hub"
+  timeout: "hub"
+  default: "hub"
 items_granted: []
 items_required: []
 timeout_after_audio: true 

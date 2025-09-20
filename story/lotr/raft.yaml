@@ -2,8 +2,8 @@ id: "raft"
 text: "float on"
 connections: {}  
 hidden_connections:
-  "timeout": "hub"
-  "default": "hub"
+  timeout: "hub"
+  default: "hub"
 items_granted: ["ring"]
 items_required: []
 timeout_after_audio: true 

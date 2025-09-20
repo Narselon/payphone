@@ -2,8 +2,8 @@ id: "fish"
 text: "Another riddle"
 connections: {}
 hidden_connections:
-  "timeout": "barrel"
-  "default": "barrel"
+  timeout: "barrel"
+  default: "barrel"
 items_granted: []
 items_required: []
 timeout_after_audio: true

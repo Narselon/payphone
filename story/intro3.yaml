@@ -31,7 +31,7 @@ hidden_connections:
   "325574649453451": "plotdevice"
   "325594534517464": "plotdevice"
   "325594537464451": "plotdevice"
-  "timeout": {
+  timeout: {
     "ring,wild,451,full_tummy": "plotdevice",  
     "ring,wild,451,full_tummy,sand": "plotdevice_sand"      
   }

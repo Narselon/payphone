@@ -2,6 +2,6 @@ id: "pocketsand"
 text: "pocketsand"
 connections: {}
 hidden_connections:
-  "default": "plotdevice"
+  default: "plotdevice"
 items_granted: ["plothole"]
 items_required: ["sand"]

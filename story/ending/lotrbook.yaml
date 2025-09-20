@@ -2,13 +2,13 @@ id: "lotrbook"
 text: "incorrect"
 connections: {}
 hidden_connections:
-  "timeout": {
+  timeout: {
     "451book,animalfarmbook,lotrbook,wildthingsbook": "all_banned",  # Triggers if player has all 4 keys
-    "default": "imposterbook"       # Return to same scene if not
+    default: "imposterbook"       # Return to same scene if not
   }
-  "default": {
+  default: {
     "451book,animalfarmbook,lotrbook,wildthingsbook": "all_banned",  # Triggers if player has all 4 keys
-    "default": "imposterbook"
+    default: "imposterbook"
   }
 items_granted: ["lotrbook"]
 items_required: []
