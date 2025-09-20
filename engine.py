@@ -6,21 +6,19 @@ from scene_audio import SceneAudio  # Import the new SceneAudio class
 from payphone import payphone  # Import the payphone module
 
 class Scene:
-    def __init__(self, id, text, connections, hidden_connections=None, items_granted=None, items_required=None):
+    def __init__(self, id, text, connections, hidden_connections=None, items_granted=None, 
+                 items_required=None, timeout_after_audio=False):
         self.id = id
         self.text = text
         self.connections = connections
         self.hidden_connections = hidden_connections if hidden_connections else {}
         self.items_granted = items_granted if items_granted else []
         self.items_required = items_required if items_required else []
+        self.timeout_after_audio = timeout_after_audio  # New flag
 
     def display(self, inventory):
         print("-" * 50)  
         print(self.text)
-        
-        # Display inventory if it's not empty
-        if inventory:
-            print("\nInventory:", ", ".join(inventory))
         
         # Display available choices
         for key, value in self.connections.items():
@@ -143,7 +141,8 @@ def load_scenes():
                     connections=formatted_connections,
                     hidden_connections=data.get("hidden_connections", {}),
                     items_granted=data.get("items_granted", []),
-                    items_required=data.get("items_required", [])
+                    items_required=data.get("items_required", []),
+                    timeout_after_audio=data.get("timeout_after_audio", False)
                 )
                 print(f"Loaded scene: {data['id']} from {filepath}")
         except Exception as e:
@@ -164,6 +163,25 @@ def load_scenes():
     )
     
     return scenes
+
+
+def handle_timed_input(scene, scene_audio, timeout_seconds=3):
+    """Handle timed input for a scene"""
+    if scene.timeout_after_audio:
+        # Wait for audio to finish
+        while scene_audio.is_playing():
+            time.sleep(0.1)
+            
+        # Now start the timeout
+        print("Audio finished, starting timeout...")
+    
+    start_time = time.time()
+    while time.time() - start_time < timeout_seconds:
+        choice = keypad.wait_for_single_keypress()
+        if choice:
+            return choice
+            
+    return "timeout"
 
 
 def main():
@@ -205,7 +223,7 @@ def main():
             scene = scenes.get(current_scene)
             if not scene:
                 print(f"Error: Scene '{current_scene}' not found! Resetting to intro.")
-                current_scene = "intro"
+                current_scene = "hub"
                 continue
 
             # Check if we can enter the scene based on required items
@@ -215,26 +233,25 @@ def main():
                 time.sleep(2)  # Give player time to read the message
                 
                 # Go back to the previous scene if possible, or intro if not
-                current_scene = previous_scene if previous_scene else "intro"
+                current_scene = previous_scene if previous_scene else "hub"
                 continue
             
-            # Play scene audio
+            # Play scene audio and wait if needed
             scene_audio.play_scene_audio(current_scene)
-            
-            # Store the current scene as previous for backtracking if needed
-            previous_scene = current_scene
             
             # Display the scene with options
             scene.display(inventory)
             
-            # Grant items from the scene
-            for item in scene.items_granted:
-                if item not in inventory:
-                    inventory.add(item)
-                    print(f"You obtained: {item}!")
-            
-            # Get player input - using the new wait_for_keypress that handles code entry
-            choice = keypad.wait_for_keypress()
+            # Get player input with timeout if specified
+            if "timeout" in scene.hidden_connections:
+                if scene.timeout_after_audio:
+                    # Wait for audio to finish
+                    while scene_audio.is_playing():
+                        time.sleep(0.1)
+                    print("Audio finished, starting timeout...")
+                choice = handle_timed_input(scene, scene_audio)
+            else:
+                choice = keypad.wait_for_keypress()
             
             # If the hook state changed (phone hung up), break the game loop
             if not keypad.is_phone_lifted() or choice is None:
@@ -248,24 +265,23 @@ def main():
                 scene_audio.stop_audio()  # Stop any playing audio
                 break
                 
-            # Handle special command for showing inventory
+            # Handle special command for replaying scene audio
             if choice == "#":
-                print("\nInventory:")
-                if inventory:
-                    for item in inventory:
-                        print(f"- {item}")
-                else:
-                    print("Empty")
-                print("\nPress any key to continue...")
-                keypad.wait_for_single_keypress()
-                
-                # Redisplay the scene without incrementing it
-                continue
+                print("\nReplaying scene audio...")
+                scene_audio.stop_audio()  # Stop any currently playing audio
+                scene_audio.play_scene_audio(current_scene)  # Replay the scene audio
+                continue  # Return to scene options
 
             # Get next scene based on user choice
             next_scene, message = scene.get_next_scene(choice, inventory)
 
             if next_scene:
+                # Grant any items from the current scene before moving on
+                for item in scene.items_granted:
+                    if item not in inventory:
+                        inventory.add(item)
+                        print(f"You obtained: {item}!")
+                
                 # If scene changes, play the new scene audio
                 if next_scene != current_scene:
                     scene_audio.stop_audio()  # Stop current audio before changing scenes

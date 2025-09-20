@@ -1,4 +1,4 @@
-id: "go home"
+id: "go_home"
 text: "travel with radagast or go home"
 connections: 
   1: ["climb_tree", "climb_tree", []]

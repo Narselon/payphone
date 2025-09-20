@@ -1,4 +1,4 @@
-id: "7 leg"
+id: "7_leg"
 text: "wrong try again"
 connections:
   1: ["1_leg", "1_leg", []]

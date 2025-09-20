@@ -1,4 +1,4 @@
-id: "climb tree"
+id: "climb_tree"
 text: "on tree jump or climb down"
 connections: 
   2: ["jump", "jump", []]

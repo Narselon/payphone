@@ -1,4 +1,4 @@
-id: "throw rock"
+id: "throw_rock"
 text: "throw 2nd rock, lie about fish, run"
 connections: 
   1: ["throw_2nd_rock", "throw_2nd_rock", []]

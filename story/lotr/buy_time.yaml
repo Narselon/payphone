@@ -1,4 +1,4 @@
-id: "buy time"
+id: "buy_time"
 text: "toss 2nd rock or reason"
 connections: 
   2: ["throw_2nd_rock", "throw_2nd_rock", []]

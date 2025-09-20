@@ -1,4 +1,4 @@
-id: "not much choice"
+id: "not_much_choice"
 text: "riddle"
 connections: 
   1: ["riddle", "riddle", []]
