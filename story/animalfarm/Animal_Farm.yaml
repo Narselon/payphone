@@ -1,4 +1,4 @@
-id: "Animal Farm"
+id: "Animal_Farm"
 text: "Press 1 for human. 2 for neighbor"
 connections:
   1: ["human", "human", []]

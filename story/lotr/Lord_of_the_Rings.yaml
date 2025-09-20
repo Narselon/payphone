@@ -1,4 +1,4 @@
-id: "Lord of the Rings"
+id: "Lord_of_the_Rings"
 text: "1 investigate. 2 float on"
 connections:
   1: ["investigate", "investigate", []]

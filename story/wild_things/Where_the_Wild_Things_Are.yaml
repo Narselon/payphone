@@ -1,4 +1,4 @@
-id: "Where the Wild Things Are"
+id: "Where_the_Wild_Things_Are"
 text: "1 Start homework. 2 play Stardew"
 connections:
   1: ["homework", "homework", []]
