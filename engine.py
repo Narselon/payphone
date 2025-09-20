@@ -34,8 +34,28 @@ class Scene:
         
         # Check if the choice is a special hidden connection (like timeout)
         if choice in self.hidden_connections:
-            print(f"DEBUG: Found hidden connection for '{choice}' -> '{self.hidden_connections[choice]}'")
-            return self.hidden_connections[choice], None
+            connection = self.hidden_connections[choice]
+            print(f"DEBUG: Found hidden connection for '{choice}' -> '{connection}'")
+            
+            # Handle timeout with item-based branching
+            if choice == "timeout" and isinstance(connection, dict):
+                print(f"DEBUG: Timeout with item-based branching, inventory: {inventory}")
+                
+                # Check each item combination to see if player has all required items
+                for item_list_str, target_scene in connection.items():
+                    required_items = [item.strip() for item in item_list_str.split(',')]
+                    print(f"DEBUG: Checking if player has all items: {required_items}")
+                    
+                    if all(item in inventory for item in required_items):
+                        print(f"DEBUG: Player has all required items {required_items}, going to: {target_scene}")
+                        return target_scene, None
+                
+                # If no item combination matches, don't advance (stay in current scene)
+                print("DEBUG: Player doesn't have required items for timeout progression, staying in current scene")
+                return None, "You need the right items to progress..."
+            else:
+                # Regular hidden connection (string target)
+                return connection, None
 
         # Check if it's a regular numbered choice
         try:
