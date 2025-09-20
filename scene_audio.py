@@ -40,6 +40,14 @@ class SceneAudio:
                 self.beep_sound = pygame.mixer.Sound(beep_path)
         except Exception as e:
             print(f"Error loading beep sound: {e}")
+    
+    def is_playing(self):
+        """Check if scene audio is currently playing"""
+        try:
+            return self.scene_channel.get_busy()
+        except Exception as e:
+            print(f"Error checking if audio is playing: {e}")
+            return False
         
     def play_key_beep(self, *args, **kwargs):
         """Play a short beep sound before scene audio."""
