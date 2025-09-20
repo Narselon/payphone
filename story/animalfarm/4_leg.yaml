@@ -1,10 +1,9 @@
 id: "4 leg"
-text: "Snowball or Napoleon"
-connections:
-  1: ["snowball", "snowball", []]
-  2: ["napoleon", "napoleon", []]
+text: "spoke friend"
+connections: {}
 hidden_connections:
-  "0": "hub"
-  "skip": "scene3"
+  "timeout": "friend"
+  "default": "friend"
 items_granted: []
 items_required: []
+timeout_after_audio: true 
