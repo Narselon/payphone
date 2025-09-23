@@ -408,19 +408,4 @@ def main():
                 if next_scene != current_scene:
                     scene_audio.stop_audio()  # Stop current audio before changing scenes
                 current_scene = next_scene
-                print(f"DEBUG: Moving to scene: {current_scene}")
-            elif message:
-                print(message)
-                time.sleep(1.5)  # Give player time to read
-            else:
-                print("Invalid choice. Try again.")
-                time.sleep(1)
-        
-        # Stop audio when game resets
-        scene_audio.stop_audio()
-        payphone.stop_adventure()  # Add this line
-        print("Game reset. Waiting for phone to be lifted...")
-
-
-if __name__ == "__main__":
-    main()
+           
