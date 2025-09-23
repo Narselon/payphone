@@ -336,13 +336,33 @@ def main():
             # Display the scene with options
             scene.display(inventory)
             
-            # Get player input with timeout if specified
+            # Check if timeout should be used (only if player has required items)
+            should_use_timeout = False
             if "timeout" in scene.hidden_connections:
-                print(f"DEBUG: Scene {current_scene} has timeout connection")
+                timeout_connection = scene.hidden_connections["timeout"]
+                if isinstance(timeout_connection, dict):
+                    # Check if player has any of the required item combinations
+                    for item_list_str, target_scene in timeout_connection.items():
+                        required_items = [item.strip() for item in item_list_str.split(',')]
+                        if all(item in inventory for item in required_items):
+                            should_use_timeout = True
+                            print(f"DEBUG: Player has required items {required_items}, enabling timeout")
+                            break
+                    
+                    if not should_use_timeout:
+                        print(f"DEBUG: Player doesn't have required items for timeout, using regular input")
+                else:
+                    # Simple timeout connection, always use it
+                    should_use_timeout = True
+                    print(f"DEBUG: Simple timeout connection found")
+
+            # Get player input with timeout if appropriate
+            if should_use_timeout:
+                print(f"DEBUG: Scene {current_scene} using timeout input")
                 choice = handle_timed_input(scene, scene_audio)
                 print(f"DEBUG: handle_timed_input returned: '{choice}'")
             else:
-                print(f"DEBUG: Scene {current_scene} has no timeout connection, using regular input")
+                print(f"DEBUG: Scene {current_scene} using regular input")
                 choice = keypad.wait_for_keypress()
             
             # If the hook state changed (phone hung up), break the game loop
