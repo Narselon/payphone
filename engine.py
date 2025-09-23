@@ -35,11 +35,11 @@ class Scene:
         # Check if the choice is a special hidden connection (like timeout)
         if choice in self.hidden_connections:
             connection = self.hidden_connections[choice]
-            print(f"DEBUG: Found hidden connection for '{choice}' -> '{connection}'")
+            print(f"DEBUG: Found hidden connection for '{choice}' -> '{connection}' (type: {type(connection)})")
             
             # Handle timeout with item-based branching
             if choice == "timeout" and isinstance(connection, dict):
-                print(f"DEBUG: Timeout with item-based branching, inventory: {inventory}")
+                print(f"DEBUG: Timeout with item-based branching, inventory: {list(inventory)}")
                 
                 # Check each item combination to see if player has all required items
                 for item_list_str, target_scene in connection.items():
@@ -48,6 +48,9 @@ class Scene:
                     
                     if all(item in inventory for item in required_items):
                         print(f"DEBUG: Player has all required items {required_items}, going to: {target_scene}")
+                        if not isinstance(target_scene, str):
+                            print(f"ERROR: target_scene should be string, got {type(target_scene)}: {target_scene}")
+                            return None, "Configuration error in scene data"
                         return target_scene, None
                 
                 # If no item combination matches, don't advance (stay in current scene)
@@ -55,6 +58,9 @@ class Scene:
                 return None, "You need the right items to progress..."
             else:
                 # Regular hidden connection (string target)
+                if not isinstance(connection, str):
+                    print(f"ERROR: hidden connection should be string, got {type(connection)}: {connection}")
+                    return None, "Configuration error in scene data"
                 return connection, None
 
         # Check if it's a regular numbered choice
@@ -190,9 +196,16 @@ def load_scenes():
                     timeout_after_audio=data.get("timeout_after_audio", False),
                     timeout_seconds=data.get("timeout_seconds", 3)  # Add configurable timeout
                 )
+                
+                # Debug: Print the hidden connections to see what we're loading
                 print(f"Loaded scene: {data['id']} from {filepath}")
+                if data.get("hidden_connections"):
+                    print(f"  Hidden connections: {data.get('hidden_connections')}")
+                    
         except Exception as e:
             print(f"Error loading {filepath}: {e}")
+            import traceback
+            traceback.print_exc()
     
     # Recursively walk through directories
     for root, dirs, files in os.walk("story"):
@@ -356,7 +369,13 @@ def main():
 
             # Get next scene based on user choice
             next_scene, message = scene.get_next_scene(choice, inventory)
-            print(f"DEBUG: get_next_scene returned: next_scene='{next_scene}', message='{message}'")
+            print(f"DEBUG: get_next_scene returned: next_scene='{next_scene}' (type: {type(next_scene)}), message='{message}'")
+
+            # Validate that next_scene is a string or None
+            if next_scene is not None and not isinstance(next_scene, str):
+                print(f"ERROR: next_scene should be a string or None, got {type(next_scene)}: {next_scene}")
+                print("Staying in current scene to avoid crash")
+                continue
 
             if next_scene:
                 # Grant any items from the current scene before moving on
