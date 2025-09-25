@@ -44,10 +44,7 @@ class PayPhone:
         self.load_sounds()
         self.ring_thread = threading.Thread(target=self._random_ring_controller, daemon=True)
         self.ring_thread.start()
-        
-        # Only show debug message when GPIO is not available
-        if not GPIO_AVAILABLE:
-            print("Debug mode active - Press 'r' key to test ring")
+        print("Debug mode active - Press 'r' key to test ring")
 
     def _setup_pulseaudio(self):
         """Setup PulseAudio configuration"""

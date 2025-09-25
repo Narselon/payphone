@@ -109,6 +109,10 @@ def wait_for_hook_change(expected_state):
         target_gpio_state = GPIO.LOW if expected_state else GPIO.HIGH
         
         while GPIO.input(SWITCH_PIN) != target_gpio_state:
+            if input_ready.is_set():
+                print("Keyboard interrupt detected")
+                phone_on_hook = not expected_state
+                return False
             time.sleep(0.1)
             
         phone_on_hook = not expected_state
@@ -161,7 +165,7 @@ def keyboard_input_thread():
                                 GPIO.output(col_pin, GPIO.HIGH)
                                 continue
                                 
-                            keyboard_input = KEYPAD_MAPPING[row_num][col_num]
+                            keyboard_input = KEYPAD_MAPPING[row_num][col_pin]
                             print(f"Keypad press detected: {keyboard_input}")
                             play_keypad_sound(keyboard_input)
                             input_ready.set()
@@ -173,7 +177,7 @@ def keyboard_input_thread():
                             
                             GPIO.output(col_pin, GPIO.HIGH)
                             time.sleep(0.2)  # Delay after key release
-                            return  # Exit after handling keypress
+                            continue  # Return after handling keypress instead of continue
                             
                     GPIO.output(col_pin, GPIO.HIGH)
                 time.sleep(0.01)
@@ -181,38 +185,30 @@ def keyboard_input_thread():
             else:
                 # Fallback to keyboard input if no GPIO
                 keyboard_input = input().strip().lower()
-                if keyboard_input:
-                    # Handle ring test
-                    if keyboard_input == 'r':
-                        try:
-                            from payphone import payphone
-                            payphone.play_ring()
-                            continue
-                        except ImportError:
-                            pass
-                        
-                    # Handle regular keypad input
-                    if len(keyboard_input) == 1 and keyboard_input in KEYPAD_SOUNDS:
+                if keyboard_input and len(keyboard_input) == 1:
+                    if keyboard_input in KEYPAD_SOUNDS:
                         play_keypad_sound(keyboard_input)
                     input_ready.set()
-                    return
+                    break
                     
     except (EOFError, KeyboardInterrupt):
         _should_stop = True
 
+# Add these new functions
+
 def wait_for_single_keypress():
     """Wait for a single keypress and return it."""
-    global keyboard_input, input_ready, _input_thread, _should_stop
+    global keyboard_input, input_ready, _input_thread
     
     with _input_thread_lock:
         # Reset states
         keyboard_input = None
         input_ready.clear()
-        _should_stop = False
         
         # Start new input thread if needed
         if not _input_thread or not _input_thread.is_alive():
-            _input_thread = threading.Thread(target=keyboard_input_thread, daemon=True)
+            _input_thread = threading.Thread(target=keyboard_input_thread)
+            _input_thread.daemon = True
             _input_thread.start()
     
     # Wait for input
