@@ -165,7 +165,7 @@ def keyboard_input_thread():
                                 GPIO.output(col_pin, GPIO.HIGH)
                                 continue
                                 
-                            keyboard_input = KEYPAD_MAPPING[row_num][col_pin]
+                            keyboard_input = KEYPAD_MAPPING[row_num][col_num]
                             print(f"Keypad press detected: {keyboard_input}")
                             play_keypad_sound(keyboard_input)
                             input_ready.set()
