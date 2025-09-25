@@ -173,7 +173,7 @@ def keyboard_input_thread():
                             
                             GPIO.output(col_pin, GPIO.HIGH)
                             time.sleep(0.2)  # Delay after key release
-                            return  # Exit thread after handling keypress
+                            return  # Exit after handling keypress
                             
                     GPIO.output(col_pin, GPIO.HIGH)
                 time.sleep(0.01)

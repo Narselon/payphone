@@ -6,7 +6,6 @@ import pygame
 import os
 import time  # Add this import
 from keypad import GPIO_AVAILABLE
-#import keyboard  # Add this import at top
 import subprocess
 from typing import Optional
 
@@ -33,7 +32,7 @@ class PayPhone:
         self.adventure_active = False
         self.last_ring_time = time.time()
         self.ring_volume = 1.0
-        self.debug_mode = True
+        self.debug_mode = not GPIO_AVAILABLE  # Only enable debug mode when no GPIO
 
         # Setup PulseAudio
         self._setup_pulseaudio()
@@ -44,14 +43,18 @@ class PayPhone:
         self.load_sounds()
         self.ring_thread = threading.Thread(target=self._random_ring_controller, daemon=True)
         self.ring_thread.start()
-        print("Debug mode active - Press 'r' key to test ring")
+        
+        # Only show debug message when not using GPIO
+        if not GPIO_AVAILABLE:
+            print("Debug mode active - Press 'r' key to test ring")
 
     def _setup_pulseaudio(self):
         """Setup PulseAudio configuration"""
         try:
             # Switch to AUX by default
             self._switch_audio_output(self.AUX_DEVICE)
-            print(f"Initial audio setup: {self.AUX_DEVICE}")
+            if GPIO_AVAILABLE:
+                print(f"Initial audio setup: {self.AUX_DEVICE}")
         except Exception as e:
             print(f"PulseAudio setup error: {e}")
 
@@ -65,9 +68,9 @@ class PayPhone:
                 capture_output=True,
                 text=True
             )
-            if result.returncode == 0:
+            if result.returncode == 0 and GPIO_AVAILABLE:
                 print(f"Switched audio to {sink_name}")
-            else:
+            elif result.returncode != 0:
                 print(f"Error switching to {sink_name}: {result.stderr}")
                 
         except Exception as e:
@@ -79,7 +82,8 @@ class PayPhone:
             pygame.mixer.quit()
             pygame.mixer.pre_init(44100, -16, 2, 2048)
             pygame.mixer.init()
-            print("Mixer initialized successfully")
+            if GPIO_AVAILABLE:
+                print("Mixer initialized successfully")
         except Exception as e:
             print(f"Mixer initialization error: {e}")
 
@@ -90,7 +94,8 @@ class PayPhone:
             try:
                 self.ring_sound = pygame.mixer.Sound(ring_path)
                 self.ring_sound.set_volume(self.ring_volume)
-                print(f"Ring sound loaded from {ring_path}")
+                if GPIO_AVAILABLE:
+                    print(f"Ring sound loaded from {ring_path}")
             except Exception as e:
                 print(f"Error loading ring sound: {e}")
         else:
@@ -104,13 +109,17 @@ class PayPhone:
     def play_ring(self, duration=3):
         """Play the ring sound and control light"""
         if self.ring_sound:
-            print("Attempting to play ring sound on aux...")
-            self.set_light(GPIO.HIGH)
+            if GPIO_AVAILABLE:
+                print("Playing ring sound...")
+            else:
+                print("Attempting to play ring sound on aux...")
+            self.set_light(GPIO.HIGH if GPIO_AVAILABLE else False)
             self.ring_sound.play()
             time.sleep(duration)
             self.ring_sound.stop()
-            self.set_light(GPIO.LOW)
-            print("Ring sound completed")
+            self.set_light(GPIO.LOW if GPIO_AVAILABLE else False)
+            if GPIO_AVAILABLE:
+                print("Ring sound completed")
 
     def _random_ring_controller(self):
         """Background thread to handle random ringing"""
@@ -118,70 +127,31 @@ class PayPhone:
             now = datetime.now().time()
             current_time = time.time()
             
-            # Debug output
-            if datetime_time(14,0) <= now <= datetime_time(17,0):
-                print(f"Current time {now} is within ring window")
-            
             # Only ring between 2 PM and 5 PM
             if (datetime_time(14,0) <= now <= datetime_time(17,0) and 
                 not self.adventure_active and
                 current_time - self.last_ring_time >= 300):  # At least 5 minutes since last ring
                 
-                if random.random() < 0.3:  # Increase chance to 30%
-                    print("Triggering random ring...")
+                if random.random() < 0.3:  # 30% chance
+                    if GPIO_AVAILABLE:
+                        print("Triggering random ring...")
                     self.play_ring()
                     self.last_ring_time = current_time
                 
             time.sleep(60)  # Check every minute
 
-    def _debug_ring_trigger(self, _):
-        """Debug method to trigger ring manually"""
-        if self.debug_mode and not self.adventure_active:
-            print("Manual ring triggered")
-            self.play_ring()
-
     def start_adventure(self):
         """Switch to AIY speaker when adventure starts"""
         self.adventure_active = True
-        self.set_light(GPIO.HIGH)
+        self.set_light(GPIO.HIGH if GPIO_AVAILABLE else False)
         self._switch_audio_output(self.AIY_DEVICE)
 
     def stop_adventure(self):
         """Switch back to AUX for ringing"""
         self.adventure_active = False
-        self.set_light(GPIO.LOW)
+        self.set_light(GPIO.LOW if GPIO_AVAILABLE else False)
         self._switch_audio_output(self.AUX_DEVICE)
         self.load_sounds()
 
 # Create a global instance
 payphone = PayPhone()
-
-# filepath: /c:/Users/Narselon/Documents/PayphoneTesting/payphone/keypad.py
-# Add to KEYPAD_SOUNDS dictionary:
-KEYPAD_SOUNDS = {
-    # ...existing mappings...
-    "r": "ring.mp3",  # Add ring sound mapping
-}
-
-def keyboard_input_thread():
-    """Thread function to handle keyboard input."""
-    global keyboard_input, _should_stop
-    
-    try:
-        while not _should_stop:
-            keyboard_input = input().strip().lower()
-            if keyboard_input:
-                # Handle ring test
-                if keyboard_input == 'r' and not GPIO_AVAILABLE:
-                    from payphone import payphone
-                    payphone.play_ring()
-                    continue
-                    
-                # Handle regular keypad input
-                if not GPIO_AVAILABLE and len(keyboard_input) == 1:
-                    if keyboard_input in KEYPAD_SOUNDS:
-                        play_keypad_sound(keyboard_input)
-                input_ready.set()
-                break
-    except (EOFError, KeyboardInterrupt):
-        _should_stop = True
