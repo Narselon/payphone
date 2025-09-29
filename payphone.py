@@ -155,33 +155,3 @@ class PayPhone:
 
 # Create a global instance
 payphone = PayPhone()
-
-# filepath: /c:/Users/Narselon/Documents/PayphoneTesting/payphone/keypad.py
-# Add to KEYPAD_SOUNDS dictionary:
-KEYPAD_SOUNDS = {
-    # ...existing mappings...
-    "r": "ring.mp3",  # Add ring sound mapping
-}
-
-def keyboard_input_thread():
-    """Thread function to handle keyboard input."""
-    global keyboard_input, _should_stop
-    
-    try:
-        while not _should_stop:
-            keyboard_input = input().strip().lower()
-            if keyboard_input:
-                # Handle ring test
-                if keyboard_input == 'r' and not GPIO_AVAILABLE:
-                    from payphone import payphone
-                    payphone.play_ring()
-                    continue
-                    
-                # Handle regular keypad input
-                if not GPIO_AVAILABLE and len(keyboard_input) == 1:
-                    if keyboard_input in KEYPAD_SOUNDS:
-                        play_keypad_sound(keyboard_input)
-                input_ready.set()
-                break
-    except (EOFError, KeyboardInterrupt):
-        _should_stop = True

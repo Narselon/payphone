@@ -7,7 +7,7 @@ from payphone import payphone  # Import the payphone module
 
 class Scene:
     def __init__(self, id, text, connections, hidden_connections=None, items_granted=None, 
-                 items_required=None, timeout_after_audio=False, timeout_seconds=3):
+                 items_required=None, timeout_after_audio=False):
         self.id = id
         self.text = text
         self.connections = connections
@@ -15,7 +15,6 @@ class Scene:
         self.items_granted = items_granted if items_granted else []
         self.items_required = items_required if items_required else []
         self.timeout_after_audio = timeout_after_audio  # New flag
-        self.timeout_seconds = timeout_seconds  # Configurable timeout duration
 
     def display(self, inventory):
         print("-" * 50)  
@@ -30,48 +29,36 @@ class Scene:
         Determine the next scene based on choice and inventory items.
         Supports multiple branching paths based on specific items.
         """
-        print(f"DEBUG: get_next_scene called with choice='{choice}', connections={self.connections}")
-        
-        # Check if the choice is a special hidden connection (like timeout)
+        # Check if the choice is a special hidden connection
         if choice in self.hidden_connections:
             connection = self.hidden_connections[choice]
-            print(f"DEBUG: Found hidden connection for '{choice}' -> '{connection}' (type: {type(connection)})")
             
             # Handle timeout with item-based branching
             if choice == "timeout" and isinstance(connection, dict):
-                print(f"DEBUG: Timeout with item-based branching, inventory: {list(inventory)}")
+                # Find the best match (most items required that player has)
+                best_match = None
+                best_count = 0
                 
-                # Check each item combination to see if player has all required items
                 for item_list_str, target_scene in connection.items():
                     required_items = [item.strip() for item in item_list_str.split(',')]
-                    print(f"DEBUG: Checking if player has all items: {required_items}")
-                    
                     if all(item in inventory for item in required_items):
-                        print(f"DEBUG: Player has all required items {required_items}, going to: {target_scene}")
-                        if not isinstance(target_scene, str):
-                            print(f"ERROR: target_scene should be string, got {type(target_scene)}: {target_scene}")
-                            return None, "Configuration error in scene data"
-                        return target_scene, None
+                        if len(required_items) > best_count:
+                            best_match = target_scene
+                            best_count = len(required_items)
                 
-                # If no item combination matches, don't advance (stay in current scene)
-                print("DEBUG: Player doesn't have required items for timeout progression, staying in current scene")
-                return None, "You need the right items to progress..."
+                if best_match:
+                    return best_match, None
+                else:
+                    # No required items, stay in scene
+                    return None, "You need the right items to progress..."
             else:
-                # Regular hidden connection (string target)
-                if not isinstance(connection, str):
-                    print(f"ERROR: hidden connection should be string, got {type(connection)}: {connection}")
-                    return None, "Configuration error in scene data"
                 return connection, None
 
         # Check if it's a regular numbered choice
         try:
             choice_index = int(choice)
-            print(f"DEBUG: Converted choice to int: {choice_index}")
-            
             if choice_index in self.connections:
-                print(f"DEBUG: Found connection for choice {choice_index}")
                 connection_data = self.connections[choice_index]
-                print(f"DEBUG: Connection data: {connection_data}")
                 option_text = connection_data[0]
                 
                 # Handle standard format: [text, target, required_items, alt_scene]
@@ -80,18 +67,14 @@ class Scene:
                     required_items = connection_data[2] if len(connection_data) > 2 else []
                     alt_scene_id = connection_data[3] if len(connection_data) > 3 else None
                     
-                    print(f"DEBUG: Standard format - target: {target_scene_id}, required: {required_items}")
-                    
                     # Special case for calling without a phone number
                     if target_scene_id == "scene2" and "phone_number" not in inventory:
                         return "no_numbers_scene", None
                     
                     # Check if player has all required items
                     if all(item in inventory for item in required_items):
-                        print(f"DEBUG: All required items present, going to: {target_scene_id}")
                         return target_scene_id, None
                     elif alt_scene_id:
-                        print(f"DEBUG: Missing items, going to alt scene: {alt_scene_id}")
                         return alt_scene_id, None
                     else:
                         missing_items = [item for item in required_items if item not in inventory]
@@ -101,33 +84,20 @@ class Scene:
                 # Handle advanced branching: [text, {item1: scene1, item2: scene2, ..., "default": default_scene}]
                 elif len(connection_data) >= 2 and isinstance(connection_data[1], dict):
                     paths = connection_data[1]
-                    print(f"DEBUG: Advanced branching format - paths: {paths}")
                     
                     # First check for specific items in inventory that have defined paths
                     for item, scene_id in paths.items():
                         if item in inventory and item != "default":
-                            print(f"DEBUG: Found matching item '{item}', going to: {scene_id}")
                             return scene_id, None
                     
                     # If no matching item, use the default path if provided
                     if "default" in paths:
-                        print(f"DEBUG: Using default path: {paths['default']}")
                         return paths["default"], None
                     else:
                         return None, "You don't have the right item for this action."
-            else:
-                print(f"DEBUG: Choice {choice_index} not found in connections")
-                
         except ValueError:
-            print(f"DEBUG: Choice '{choice}' is not a valid integer")
             pass  # Ignore non-integer choices (except for hidden ones)
-        
-        # If we get here, check if there's a default action for any button press
-        if "default" in self.hidden_connections:
-            print(f"DEBUG: Using default hidden connection: {self.hidden_connections['default']}")
-            return self.hidden_connections["default"], None
             
-        print("DEBUG: No valid choice found, returning invalid choice message")
         return None, "Invalid choice. Try again."
 
 
@@ -193,19 +163,11 @@ def load_scenes():
                     hidden_connections=data.get("hidden_connections", {}),
                     items_granted=data.get("items_granted", []),
                     items_required=data.get("items_required", []),
-                    timeout_after_audio=data.get("timeout_after_audio", False),
-                    timeout_seconds=data.get("timeout_seconds", 3)  # Add configurable timeout
+                    timeout_after_audio=data.get("timeout_after_audio", False)
                 )
-                
-                # Debug: Print the hidden connections to see what we're loading
                 print(f"Loaded scene: {data['id']} from {filepath}")
-                if data.get("hidden_connections"):
-                    print(f"  Hidden connections: {data.get('hidden_connections')}")
-                    
         except Exception as e:
             print(f"Error loading {filepath}: {e}")
-            import traceback
-            traceback.print_exc()
     
     # Recursively walk through directories
     for root, dirs, files in os.walk("story"):
@@ -224,57 +186,19 @@ def load_scenes():
     return scenes
 
 
-def handle_timed_input(scene, scene_audio):
+def handle_timed_input(scene, scene_audio, timeout_seconds=3):
     """Handle timed input for a scene"""
-    timeout_seconds = getattr(scene, 'timeout_seconds', 3)  # Use scene's timeout or default to 3
-    
-    print(f"DEBUG: Starting timed input with {timeout_seconds}s timeout")
-    print(f"DEBUG: timeout_after_audio = {scene.timeout_after_audio}")
-    
     if scene.timeout_after_audio:
-        print("DEBUG: Waiting for audio to finish...")
         # Wait for audio to finish
         while scene_audio.is_playing():
             time.sleep(0.1)
-            
-        print("Audio finished, starting timeout...")
-    else:
-        print("DEBUG: Starting timeout immediately (no audio wait)")
     
-    # Now start the timeout
     start_time = time.time()
-    print(f"DEBUG: Timeout started at {start_time}")
-    
-    # Use threading to handle the timeout properly
-    import threading
-    choice_result = [None]  # Use list to allow modification in nested function
-    
-    def get_input():
-        try:
-            choice = keypad.wait_for_single_keypress()
-            if choice:
-                choice_result[0] = choice
-                print(f"DEBUG: User pressed '{choice}' before timeout")
-        except Exception as e:
-            print(f"DEBUG: Error getting input: {e}")
-    
-    # Start input thread
-    input_thread = threading.Thread(target=get_input, daemon=True)
-    input_thread.start()
-    
-    # Wait for either timeout or input
-    elapsed = 0
-    while elapsed < timeout_seconds:
-        if choice_result[0] is not None:
-            return choice_result[0]
-        time.sleep(0.1)
-        elapsed = time.time() - start_time
-        
-        # Debug progress every second
-        if int(elapsed) != int(elapsed - 0.1):
-            print(f"DEBUG: Timeout progress: {elapsed:.1f}/{timeout_seconds}s")
-    
-    print("DEBUG: Timeout reached, returning 'timeout'")
+    while time.time() - start_time < timeout_seconds:
+        choice = keypad.wait_for_single_keypress()
+        if choice:
+            return choice
+            
     return "timeout"
 
 
@@ -305,7 +229,7 @@ def main():
     while True:
         # Wait for the phone to be lifted to start/restart the game
         keypad.wait_for_hook_change(expected_state=True)
-        payphone.start_adventure()  # Add this line
+        payphone.start_adventure()
         
         # Initialize game state
         current_scene = "intro"  # Start scene
@@ -336,7 +260,7 @@ def main():
             # Display the scene with options
             scene.display(inventory)
             
-            # Check if timeout should be used (only if player has required items)
+            # Check if timeout should be used (only if player has required items for timeout)
             should_use_timeout = False
             if "timeout" in scene.hidden_connections:
                 timeout_connection = scene.hidden_connections["timeout"]
@@ -346,23 +270,15 @@ def main():
                         required_items = [item.strip() for item in item_list_str.split(',')]
                         if all(item in inventory for item in required_items):
                             should_use_timeout = True
-                            print(f"DEBUG: Player has required items {required_items}, enabling timeout")
                             break
-                    
-                    if not should_use_timeout:
-                        print(f"DEBUG: Player doesn't have required items for timeout, using regular input")
                 else:
-                    # Simple timeout connection, always use it
+                    # Simple timeout connection
                     should_use_timeout = True
-                    print(f"DEBUG: Simple timeout connection found")
 
             # Get player input with timeout if appropriate
             if should_use_timeout:
-                print(f"DEBUG: Scene {current_scene} using timeout input")
                 choice = handle_timed_input(scene, scene_audio)
-                print(f"DEBUG: handle_timed_input returned: '{choice}'")
             else:
-                print(f"DEBUG: Scene {current_scene} using regular input")
                 choice = keypad.wait_for_keypress()
             
             # If the hook state changed (phone hung up), break the game loop
@@ -389,13 +305,6 @@ def main():
 
             # Get next scene based on user choice
             next_scene, message = scene.get_next_scene(choice, inventory)
-            print(f"DEBUG: get_next_scene returned: next_scene='{next_scene}' (type: {type(next_scene)}), message='{message}'")
-
-            # Validate that next_scene is a string or None
-            if next_scene is not None and not isinstance(next_scene, str):
-                print(f"ERROR: next_scene should be a string or None, got {type(next_scene)}: {next_scene}")
-                print("Staying in current scene to avoid crash")
-                continue
 
             if next_scene:
                 # Grant any items from the current scene before moving on
@@ -408,4 +317,18 @@ def main():
                 if next_scene != current_scene:
                     scene_audio.stop_audio()  # Stop current audio before changing scenes
                 current_scene = next_scene
-           
+            elif message:
+                print(message)
+                time.sleep(1.5)  # Give player time to read
+            else:
+                print("Invalid choice. Try again.")
+                time.sleep(1)
+        
+        # Stop audio when game resets
+        scene_audio.stop_audio()
+        payphone.stop_adventure()
+        print("Game reset. Waiting for phone to be lifted...")
+
+
+if __name__ == "__main__":
+    main()
