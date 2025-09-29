@@ -1,4 +1,4 @@
-id: "gollum run"
+id: "gollum_run"
 text: "try running find orcs"
 connections: {}
 hidden_connections:
