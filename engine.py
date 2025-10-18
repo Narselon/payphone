@@ -29,7 +29,7 @@ class Scene:
         Determine the next scene based on choice and inventory items.
         Supports multiple branching paths based on specific items.
         """
-        # Check if the choice is a special hidden connection
+        # Check if the choice is a special hidden connection (codes, timeouts, etc.)
         if choice in self.hidden_connections:
             connection = self.hidden_connections[choice]
             
@@ -54,7 +54,7 @@ class Scene:
             else:
                 return connection, None
 
-        # Check if it's a regular numbered choice
+        # Check if it's a regular numbered choice (1-9, 0, etc.)
         try:
             choice_index = int(choice)
             if choice_index in self.connections:
@@ -96,7 +96,11 @@ class Scene:
                     else:
                         return None, "You don't have the right item for this action."
         except ValueError:
-            pass  # Ignore non-integer choices (except for hidden ones)
+            # Not a single digit - could be a multi-digit code that wasn't in hidden_connections
+            # Check if there's a "wrong_code" connection for invalid codes
+            if "wrong_code" in self.hidden_connections:
+                return self.hidden_connections["wrong_code"], None
+            pass  # Ignore non-integer choices
             
         return None, "Invalid choice. Try again."
 

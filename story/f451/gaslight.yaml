@@ -4,6 +4,6 @@ connections: {}
 hidden_connections:
   "0": "hub"
   "451": "451"
-  "wrong": "wrong_code"
+  "wrong_code": "wrong_code"
 items_granted: []
 items_required: []
