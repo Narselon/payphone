@@ -43,7 +43,7 @@ class Scene:
         Determine the next scene based on choice and inventory items.
         Supports multiple branching paths based on specific items.
         """
-        # Check if the choice is a special hidden connection (codes, timeouts, etc.)
+        # Check if the choice is a special hidden connection (timeout, codes, etc.)
         if choice in self.hidden_connections:
             connection = self.hidden_connections[choice]
             
@@ -61,11 +61,14 @@ class Scene:
                             best_count = len(required_items)
                 
                 if best_match:
+                    print(f"DEBUG: Timeout with items, going to: {best_match}")
                     return best_match, None
                 else:
                     # No required items, stay in scene
                     return None, "You need the right items to progress..."
             else:
+                # Regular hidden connection (simple string or timeout without items)
+                print(f"DEBUG: Hidden connection '{choice}' -> '{connection}'")
                 return connection, None
 
         # Check if it's a regular numbered choice (1-9, 0, etc.)
