@@ -1,338 +1,263 @@
-import os
-import yaml
-import keypad
+import sys
 import time
-from scene_audio import SceneAudio  # Import the new SceneAudio class
-from payphone import payphone  # Import the payphone module
+import threading
+import pygame  # For playing MP3 sounds
+import atexit
+from threading import Lock
+from threading import Event
+import os
 
-class Scene:
-    def __init__(self, id, text, connections, hidden_connections=None, items_granted=None, 
-                 items_required=None, timeout_after_audio=False):
-        self.id = id
-        self.text = text
-        self.connections = connections
-        self.hidden_connections = hidden_connections if hidden_connections else {}
-        self.items_granted = items_granted if items_granted else []
-        self.items_required = items_required if items_required else []
-        self.timeout_after_audio = timeout_after_audio  # New flag
+try:
+    import RPi.GPIO as GPIO
+    GPIO_AVAILABLE = True
+except ImportError:
+    GPIO_AVAILABLE = False  # If running on a PC without GPIO
+    from unittest.mock import MagicMock
+    GPIO = MagicMock()
 
-    def display(self, inventory):
-        print("-" * 50)  
-        print(self.text)
+if GPIO_AVAILABLE:
+    GPIO.setmode(GPIO.BCM)
+
+    # Define GPIO pins
+    COLS = [3, 10, 8]
+    ROWS = [2, 11, 9, 7]
+    SWITCH_PIN = 23  # Hook switch
+
+    # Setup GPIO
+    for col in COLS:
+        GPIO.setup(col, GPIO.OUT)
+        GPIO.output(col, GPIO.HIGH)
+
+    for row in ROWS:
+        GPIO.setup(row, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+    # Set up GPIO for the switch with a pull-down resistor
+    GPIO.setup(SWITCH_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+
+    KEYPAD_MAPPING = [
+        ["1", "2", "3"],
+        ["4", "5", "6"],
+        ["7", "8", "9"],
+        ["*", "0", "#"]
+    ]
+
+# Initialize sound system
+pygame.mixer.init()
+
+# Sound configuration
+SOUND_DIRECTORY = "sounds/"  # Directory where sound files are stored
+KEYPAD_SOUNDS = {
+    "1": "key1.mp3",
+    "2": "key2.mp3",
+    "3": "key3.mp3",
+    "4": "key4.mp3",
+    "5": "key5.mp3",
+    "6": "key6.mp3",
+    "7": "key7.mp3",
+    "8": "key8.mp3",
+    "9": "key9.mp3",
+    "0": "key0.mp3",
+    "*": "star.mp3",
+    "#": "hash.mp3",
+    "default": "beep.mp3",  # Default sound if specific key sound is not found
+    "r": "ring.mp3",  # Add ring test mapping
+}
+
+def play_keypad_sound(key):
+    """Play sound associated with keypad press"""
+    try:
+        # Get sound file name for the key
+        sound_file = KEYPAD_SOUNDS.get(key, KEYPAD_SOUNDS["default"])
+        sound_path = os.path.join(SOUND_DIRECTORY, sound_file)
         
-        # Display available choices
-        for key, value in self.connections.items():
-            print(f"{key}. {value[0]}")
-
-    def get_next_scene(self, choice, inventory):
-        """
-        Determine the next scene based on choice and inventory items.
-        Supports multiple branching paths based on specific items.
-        """
-        # Check if the choice is a special hidden connection (codes, timeouts, etc.)
-        if choice in self.hidden_connections:
-            connection = self.hidden_connections[choice]
+        if os.path.exists(sound_path):
+            sound = pygame.mixer.Sound(sound_path)
+            sound.play()
+            time.sleep(0.1)  # Short delay to prevent sound overlap
+            print(f"Playing sound for key: {key}")
+        else:
+            print(f"Sound file not found: {sound_path}")
             
-            # Handle timeout with item-based branching
-            if choice == "timeout" and isinstance(connection, dict):
-                # Find the best match (most items required that player has)
-                best_match = None
-                best_count = 0
-                
-                for item_list_str, target_scene in connection.items():
-                    required_items = [item.strip() for item in item_list_str.split(',')]
-                    if all(item in inventory for item in required_items):
-                        if len(required_items) > best_count:
-                            best_match = target_scene
-                            best_count = len(required_items)
-                
-                if best_match:
-                    return best_match, None
-                else:
-                    # No required items, stay in scene
-                    return None, "You need the right items to progress..."
-            else:
-                return connection, None
+    except Exception as e:
+        print(f"Error playing keypad sound: {e}")
 
-        # Check if it's a regular numbered choice (1-9, 0, etc.)
-        try:
-            choice_index = int(choice)
-            if choice_index in self.connections:
-                connection_data = self.connections[choice_index]
-                option_text = connection_data[0]
-                
-                # Handle standard format: [text, target, required_items, alt_scene]
-                if len(connection_data) >= 2 and not isinstance(connection_data[1], dict):
-                    target_scene_id = connection_data[1]
-                    required_items = connection_data[2] if len(connection_data) > 2 else []
-                    alt_scene_id = connection_data[3] if len(connection_data) > 3 else None
-                    
-                    # Special case for calling without a phone number
-                    if target_scene_id == "scene2" and "phone_number" not in inventory:
-                        return "no_numbers_scene", None
-                    
-                    # Check if player has all required items
-                    if all(item in inventory for item in required_items):
-                        return target_scene_id, None
-                    elif alt_scene_id:
-                        return alt_scene_id, None
-                    else:
-                        missing_items = [item for item in required_items if item not in inventory]
-                        message = f"You can't do that. You need these items: {', '.join(missing_items)}"
-                        return None, message
-                
-                # Handle advanced branching: [text, {item1: scene1, item2: scene2, ..., "default": default_scene}]
-                elif len(connection_data) >= 2 and isinstance(connection_data[1], dict):
-                    paths = connection_data[1]
-                    
-                    # First check for specific items in inventory that have defined paths
-                    for item, scene_id in paths.items():
-                        if item in inventory and item != "default":
-                            return scene_id, None
-                    
-                    # If no matching item, use the default path if provided
-                    if "default" in paths:
-                        return paths["default"], None
-                    else:
-                        return None, "You don't have the right item for this action."
-        except ValueError:
-            # Not a single digit - could be a multi-digit code that wasn't in hidden_connections
-            # Check if there's a "wrong_code" connection for invalid codes
-            if "wrong_code" in self.hidden_connections:
-                return self.hidden_connections["wrong_code"], None
-            pass  # Ignore non-integer choices
-            
-        return None, "Invalid choice. Try again."
+# Global variables for input handling
+keyboard_input = None
+input_ready = threading.Event()
+phone_on_hook = True  # Track the state of the phone hook
+hook_state_changed = threading.Event()
+last_keypress_time = 0  # Track the time of the last keypress
+KEYPRESS_DELAY = 0.5  # Delay between keypresses in seconds
 
+# Multi-digit input variables
+input_buffer = ""
+CODE_ENTRY_MODE = False
+CODE_TIMEOUT = 3  # Seconds before code entry times out
 
-def load_scenes():
-    """Loads scenes from YAML files in the 'story' directory and its subdirectories."""
-    scenes = {}
-    
-    # Debug: Check if the story directory exists
-    if not os.path.exists("story"):
-        print("ERROR: 'story' directory not found!")
-        story_dir = "story"
-        os.makedirs(story_dir, exist_ok=True)
-        print(f"Created directory: {story_dir}")
-        return scenes
-    
-    # Debug: List all files in story directory
-    print(f"Files in story directory: {os.listdir('story')}")
-    
-    # Function to process a YAML file
-    def process_yaml_file(filepath):
-        try:
-            with open(filepath, "r") as file:
-                data = yaml.safe_load(file)
-                
-                # Process connections: transform from dictionary to more structured format
-                formatted_connections = {}
-                
-                # Handle different connection formats
-                if isinstance(data["connections"], dict):
-                    for key, value in data["connections"].items():
-                        key_int = int(key)
-                        
-                        # If the value is a string, it's just a scene ID
-                        if isinstance(value, str):
-                            formatted_connections[key_int] = [f"Go to {value}", value, []]
-                        
-                        # If it's a list, it might be standard format or contain a dict for branching
-                        elif isinstance(value, list):
-                            if len(value) >= 2 and isinstance(value[1], dict):
-                                # This is the advanced branching format
-                                formatted_connections[key_int] = value
-                            else:
-                                # This is the standard format
-                                option_text = value[0]
-                                target_scene = value[1]
-                                required_items = value[2] if len(value) > 2 else []
-                                alt_scene = value[3] if len(value) > 3 else None
-                                formatted_connections[key_int] = [option_text, target_scene, required_items, alt_scene]
-                        
-                        # If it's a dict directly, it's the branching format
-                        elif isinstance(value, dict) and "text" in value and "paths" in value:
-                            formatted_connections[key_int] = [value["text"], value["paths"]]
-                            
-                elif isinstance(data["connections"], list):
-                    # Simple list format [scene1, scene2, ...]
-                    for i, scene_id in enumerate(data["connections"], 1):
-                        formatted_connections[i] = [f"Go to {scene_id}", scene_id, []]
-                
-                scenes[data["id"]] = Scene(
-                    id=data["id"],
-                    text=data["text"],
-                    connections=formatted_connections,
-                    hidden_connections=data.get("hidden_connections", {}),
-                    items_granted=data.get("items_granted", []),
-                    items_required=data.get("items_required", []),
-                    timeout_after_audio=data.get("timeout_after_audio", False)
-                )
-                print(f"Loaded scene: {data['id']} from {filepath}")
-        except Exception as e:
-            print(f"Error loading {filepath}: {e}")
-    
-    # Recursively walk through directories
-    for root, dirs, files in os.walk("story"):
-        for file in files:
-            if file.endswith(".yaml"):
-                filepath = os.path.join(root, file)
-                process_yaml_file(filepath)
-    
-    # Add custom scene for when player has no phone numbers
-    scenes["no_numbers_scene"] = Scene(
-        id="no_numbers_scene",
-        text="You look at your phone but there are no numbers saved in your contacts. You need to find a phone number first.",
-        connections={1: ["Go back", "intro", []]}
-    )
-    
-    return scenes
+_input_thread = None
+_input_thread_lock = Lock()
+_should_stop = False
 
+phone_on_hook = True
+hook_state_changed = Event()
 
-def handle_timed_input(scene, scene_audio, timeout_seconds=3):
-    """Handle timed input for a scene"""
-    if scene.timeout_after_audio:
-        # Wait for audio to finish
-        while scene_audio.is_playing():
+def wait_for_hook_change(expected_state):
+    """Waits for the hook to change to the expected state."""
+    global phone_on_hook, keyboard_input, input_ready
+    
+    if GPIO_AVAILABLE:
+        target_gpio_state = GPIO.LOW if expected_state else GPIO.HIGH
+        
+        while GPIO.input(SWITCH_PIN) != target_gpio_state:
+            if input_ready.is_set():
+                print("Keyboard interrupt detected")
+                phone_on_hook = not expected_state
+                return False
             time.sleep(0.1)
-    
-    start_time = time.time()
-    while time.time() - start_time < timeout_seconds:
-        choice = keypad.wait_for_single_keypress()
-        if choice:
-            return choice
             
-    return "timeout"
+        phone_on_hook = not expected_state
+        print("Phone " + ("lifted off" if expected_state else "placed back on") + " the hook")
+        return True
+        
+    else:
+        # PC simulation code
+        message = "Press Enter to simulate lifting the phone" if expected_state else "Press Enter to simulate placing the phone back"
+        print(message + " (or type 'skip' to bypass): ")
+        
+        try:
+            response = input().strip().lower()
+            if response == 'skip':
+                phone_on_hook = not expected_state
+                print(f"Bypassed: Assuming phone {'lifted off' if expected_state else 'placed back on'} the hook")
+                return False
+            else:
+                phone_on_hook = not expected_state
+                print(f"Simulated phone {'lifted off' if expected_state else 'placed back on'} the hook")
+                return True
+        except (KeyboardInterrupt, EOFError):
+            return False
 
+def is_phone_lifted():
+    """Returns True if phone is off hook, False otherwise."""
+    global phone_on_hook
+    return not phone_on_hook
 
-def main():
-    scenes = load_scenes()
-    print(f"DEBUG: Loaded scenes = {scenes.keys()}")
+def keyboard_input_thread():
+    """Thread function to handle keyboard input."""
+    global keyboard_input, _should_stop, last_keypress_time
     
-    # Initialize scene audio
-    scene_audio = SceneAudio()
+    try:
+        while not _should_stop:
+            current_time = time.time()
+            
+            # Check GPIO keypad first if available
+            if GPIO_AVAILABLE:
+                # Check each column
+                for col_num, col_pin in enumerate(COLS):
+                    GPIO.output(col_pin, GPIO.LOW)  # Set column low
+                    time.sleep(0.01)  # Add delay for GPIO to settle
+                    
+                    # Check each row
+                    for row_num, row_pin in enumerate(ROWS):
+                        if GPIO.input(row_pin) == GPIO.LOW:  # Key pressed
+                            # Debounce check
+                            if current_time - last_keypress_time < KEYPRESS_DELAY:
+                                GPIO.output(col_pin, GPIO.HIGH)
+                                continue
+                                
+                            keyboard_input = KEYPAD_MAPPING[row_num][col_num]
+                            print(f"Keypad press detected: {keyboard_input}")
+                            play_keypad_sound(keyboard_input)
+                            input_ready.set()
+                            last_keypress_time = current_time
+                            
+                            # Wait for key release
+                            while GPIO.input(row_pin) == GPIO.LOW:
+                                time.sleep(0.05)
+                            
+                            GPIO.output(col_pin, GPIO.HIGH)
+                            time.sleep(0.2)  # Delay after key release
+                            continue  # Return after handling keypress instead of continue
+                            
+                    GPIO.output(col_pin, GPIO.HIGH)
+                time.sleep(0.01)
+                    
+            else:
+                # Fallback to keyboard input if no GPIO
+                keyboard_input = input().strip().lower()
+                if keyboard_input and len(keyboard_input) == 1:
+                    if keyboard_input in KEYPAD_SOUNDS:
+                        play_keypad_sound(keyboard_input)
+                    input_ready.set()
+                    break
+                    
+    except (EOFError, KeyboardInterrupt):
+        _should_stop = True
+
+# Add these new functions
+
+def wait_for_single_keypress():
+    """Wait for a single keypress and return it."""
+    global keyboard_input, input_ready, _input_thread
     
-    print("\nGame Controls:")
-    print("- Use number keys to select options")
-    print("- Press 'h' at any time to hang up the phone")
-    print("- Press '*' to start entering a code, then enter your code and press '#' when done")
-    print("- Press '#' to view your inventory")
-    print("\nWaiting for phone to be lifted...")
+    with _input_thread_lock:
+        # Reset states
+        keyboard_input = None
+        input_ready.clear()
+        
+        # Start new input thread if needed
+        if not _input_thread or not _input_thread.is_alive():
+            _input_thread = threading.Thread(target=keyboard_input_thread)
+            _input_thread.daemon = True
+            _input_thread.start()
     
-    # Check if sounds directory exists, create if not
-    if not os.path.exists("sounds"):
-        os.makedirs("sounds", exist_ok=True)
-        print("Created 'sounds' directory. Please add mp3 files for each keypad key.")
+    # Wait for input with periodic hook checks
+    while True:
+        if input_ready.wait(timeout=0.1):  # Check every 100ms
+            return keyboard_input
+        # Check if phone has been hung up
+        if GPIO_AVAILABLE:
+            if GPIO.input(SWITCH_PIN) == GPIO.HIGH:  # Phone is on hook
+                return None
+        else:
+            # For non-GPIO, we can't check hook state continuously
+            break
     
-    # Make sure scene_audio directory exists 
-    if not os.path.exists("scene_audio"):
-        os.makedirs("scene_audio", exist_ok=True)
-        print("Created 'scene_audio' directory. Please add mp3 files for each scene (format: scene_id.mp3)")
+    return keyboard_input
+
+def wait_for_keypress():
+    """Wait for keypress and handle special inputs."""
+    global CODE_ENTRY_MODE, input_buffer
     
     while True:
-        # Wait for the phone to be lifted to start/restart the game
-        keypad.wait_for_hook_change(expected_state=True)
-        payphone.start_adventure()
+        key = wait_for_single_keypress()
         
-        # Initialize game state
-        current_scene = "intro"  # Start scene
-        inventory = set()  # Player inventory
-        previous_scene = None  # Track previous scene for invalid choices
-        
-        # Game loop
-        while keypad.is_phone_lifted():
-            scene = scenes.get(current_scene)
-            if not scene:
-                print(f"Error: Scene '{current_scene}' not found! Resetting to intro.")
-                current_scene = "hub"
+        # Handle None/invalid input
+        if key is None:
+            return None
+            
+        # Handle code entry mode
+        if CODE_ENTRY_MODE:
+            if key == '#':
+                # End code entry
+                CODE_ENTRY_MODE = False
+                code = input_buffer
+                input_buffer = ""
+                return code
+            elif key == '*':
+                # Cancel code entry
+                CODE_ENTRY_MODE = False
+                input_buffer = ""
                 continue
-
-            # Check if we can enter the scene based on required items
-            if not all(item in inventory for item in scene.items_required):
-                missing_items = [item for item in scene.items_required if item not in inventory]
-                print(f"You can't go there yet. You need: {', '.join(missing_items)}")
-                time.sleep(2)  # Give player time to read the message
-                
-                # Go back to the previous scene if possible, or intro if not
-                current_scene = previous_scene if previous_scene else "hub"
+            else:
+                # Add to code buffer
+                input_buffer += key
                 continue
-            
-            # Play scene audio and wait if needed
-            scene_audio.play_scene_audio(current_scene)
-            
-            # Display the scene with options
-            scene.display(inventory)
-            
-            # Check if timeout should be used (only if player has required items for timeout)
-            should_use_timeout = False
-            if "timeout" in scene.hidden_connections:
-                timeout_connection = scene.hidden_connections["timeout"]
-                if isinstance(timeout_connection, dict):
-                    # Check if player has any of the required item combinations
-                    for item_list_str, target_scene in timeout_connection.items():
-                        required_items = [item.strip() for item in item_list_str.split(',')]
-                        if all(item in inventory for item in required_items):
-                            should_use_timeout = True
-                            break
-                else:
-                    # Simple timeout connection
-                    should_use_timeout = True
-
-            # Get player input with timeout if appropriate
-            if should_use_timeout:
-                choice = handle_timed_input(scene, scene_audio)
-            else:
-                choice = keypad.wait_for_keypress()
-            
-            # If the hook state changed (phone hung up), break the game loop
-            if not keypad.is_phone_lifted() or choice is None:
-                print("Phone hung up. Game reset.")
-                scene_audio.stop_audio()  # Stop any playing audio
-                break
-            
-            # Check for hang-up command
-            if choice == 'h' or choice == 'H':
-                print("Phone hung up. Resetting game...")
-                scene_audio.stop_audio()  # Stop any playing audio
-                break
                 
-            # Handle special command for replaying scene audio
-            if choice == "#":
-                print("\nReplaying scene audio...")
-                scene_audio.stop_audio()  # Stop any currently playing audio
-                scene_audio.play_scene_audio(current_scene)  # Replay the scene audio
-                continue  # Return to scene options
-
-            # Store previous scene for backtracking
-            previous_scene = current_scene
-
-            # Get next scene based on user choice
-            next_scene, message = scene.get_next_scene(choice, inventory)
-
-            if next_scene:
-                # Grant any items from the current scene before moving on
-                for item in scene.items_granted:
-                    if item not in inventory:
-                        inventory.add(item)
-                        print(f"You obtained: {item}!")
-                
-                # If scene changes, play the new scene audio
-                if next_scene != current_scene:
-                    scene_audio.stop_audio()  # Stop current audio before changing scenes
-                current_scene = next_scene
-            elif message:
-                print(message)
-                time.sleep(1.5)  # Give player time to read
-            else:
-                print("Invalid choice. Try again.")
-                time.sleep(1)
-        
-        # Stop audio when game resets
-        scene_audio.stop_audio()
-        payphone.stop_adventure()
-        print("Game reset. Waiting for phone to be lifted...")
-
-
-if __name__ == "__main__":
-    main()
+        # Start code entry mode
+        if key == '*':
+            CODE_ENTRY_MODE = True
+            input_buffer = ""
+            continue
+            
+        return key
