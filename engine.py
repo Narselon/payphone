@@ -218,17 +218,26 @@ def handle_timed_input(scene, scene_audio):
     """Handle timed input for a scene"""
     timeout_seconds = scene.timeout_seconds  # Use scene's configured timeout
     
+    print(f"DEBUG: handle_timed_input called with timeout_seconds={timeout_seconds}")
+    print(f"DEBUG: timeout_after_audio={scene.timeout_after_audio}")
+    
     if scene.timeout_after_audio:
+        print("DEBUG: Waiting for audio to finish...")
         # Wait for audio to finish
         while scene_audio.is_playing():
             time.sleep(0.1)
+        print("DEBUG: Audio finished")
     
+    print(f"DEBUG: Starting {timeout_seconds}s timeout, waiting for keypress...")
     start_time = time.time()
     while time.time() - start_time < timeout_seconds:
         choice = keypad.wait_for_single_keypress()
         if choice:
+            print(f"DEBUG: Got choice before timeout: {choice}")
             return choice
-            
+        time.sleep(0.1)
+    
+    print(f"DEBUG: Timeout reached after {timeout_seconds}s, returning 'timeout'")
     return "timeout"
 
 
