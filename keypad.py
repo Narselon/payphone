@@ -200,8 +200,8 @@ def keyboard_input_thread():
 
 # Add these new functions
 
-def wait_for_single_keypress():
-    """Wait for a single keypress and return it."""
+def wait_for_single_keypress(timeout=None):
+    """Wait for a single keypress and return it, with optional timeout."""
     global keyboard_input, input_ready, _input_thread, _should_stop
     
     with _input_thread_lock:
@@ -215,19 +215,12 @@ def wait_for_single_keypress():
             _input_thread = threading.Thread(target=keyboard_input_thread, daemon=True)
             _input_thread.start()
     
-    # Wait for input with periodic hook checks
-    while True:
-        if input_ready.wait(timeout=0.1):  # Check every 100ms
-            return keyboard_input
-        # Check if phone has been hung up
-        if GPIO_AVAILABLE:
-            if GPIO.input(SWITCH_PIN) == GPIO.HIGH:  # Phone is on hook
-                return None
-        else:
-            # For non-GPIO, we can't check hook state continuously
-            break
-    
-    return keyboard_input
+    # Wait for input with optional timeout
+    if input_ready.wait(timeout=timeout):
+        return keyboard_input
+    else:
+        # Timeout occurred
+        return None
 
 def wait_for_keypress():
     """Wait for keypress and handle special inputs."""
