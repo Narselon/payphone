@@ -315,24 +315,32 @@ def main():
                     # Simple timeout connection
                     should_use_timeout = True
 
+            # Check for disable_star_hash flag
+            disable_star_hash = getattr(scene, "disable_star_hash", False)
+
             # Get player input with timeout if appropriate
             if should_use_timeout:
                 choice = handle_timed_input(scene, scene_audio)
             else:
                 choice = keypad.wait_for_keypress()
-            
+
             # If the hook state changed (phone hung up), break the game loop
             if not keypad.is_phone_lifted() or choice is None:
                 print("Phone hung up. Game reset.")
                 scene_audio.stop_audio()  # Stop any playing audio
                 break
-            
+
             # Check for hang-up command
             if choice == 'h' or choice == 'H':
                 print("Phone hung up. Resetting game...")
                 scene_audio.stop_audio()  # Stop any playing audio
                 break
-                
+
+            # Disable * and # if flag is set
+            if disable_star_hash and choice in ("*", "#"):
+                print("This action is disabled in this scene.")
+                continue
+
             # Handle special command for replaying scene audio
             if choice == "#":
                 print("\nReplaying scene audio...")
@@ -352,7 +360,6 @@ def main():
                     if item not in inventory:
                         inventory.add(item)
                         print(f"You obtained: {item}!")
-                
                 # If scene changes, play the new scene audio
                 if next_scene != current_scene:
                     scene_audio.stop_audio()  # Stop current audio before changing scenes
