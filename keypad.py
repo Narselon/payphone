@@ -155,11 +155,18 @@ def keyboard_input_thread():
             if GPIO_AVAILABLE:
                 # Check each column
                 for col_num, col_pin in enumerate(COLS):
+                    if _should_stop:
+                        return
+                        
                     GPIO.output(col_pin, GPIO.LOW)  # Set column low
                     time.sleep(0.01)  # Add delay for GPIO to settle
                     
                     # Check each row
                     for row_num, row_pin in enumerate(ROWS):
+                        if _should_stop:
+                            GPIO.output(col_pin, GPIO.HIGH)
+                            return
+                            
                         if GPIO.input(row_pin) == GPIO.LOW:  # Key pressed
                             key = KEYPAD_MAPPING[row_num][col_num]
                             
@@ -181,7 +188,7 @@ def keyboard_input_thread():
                             
                             GPIO.output(col_pin, GPIO.HIGH)
                             time.sleep(0.2)  # Delay after key release
-                            return  # Exit after handling keypress
+                            return  # Exit thread after handling keypress
                             
                     GPIO.output(col_pin, GPIO.HIGH)
                 time.sleep(0.01)
@@ -210,17 +217,27 @@ def wait_for_single_keypress(timeout=None):
         input_ready.clear()
         _should_stop = False
         
-        # Start new input thread if needed
+        # Start new input thread ONLY if one isn't already running
         if not _input_thread or not _input_thread.is_alive():
             _input_thread = threading.Thread(target=keyboard_input_thread, daemon=True)
             _input_thread.start()
     
     # Wait for input with optional timeout
-    if input_ready.wait(timeout=timeout):
-        return keyboard_input
+    if timeout is not None:
+        # With timeout - return None if timeout expires
+        if input_ready.wait(timeout=timeout):
+            return keyboard_input
+        else:
+            return None
     else:
-        # Timeout occurred
-        return None
+        # Without timeout - wait indefinitely with hook checks
+        while True:
+            if input_ready.wait(timeout=0.1):
+                return keyboard_input
+            # Check if phone has been hung up
+            if GPIO_AVAILABLE:
+                if GPIO.input(SWITCH_PIN) == GPIO.HIGH:
+                    return None
 
 def wait_for_keypress():
     """Wait for keypress and handle special inputs."""
