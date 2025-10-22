@@ -219,24 +219,33 @@ def wait_for_single_keypress(timeout=None):
         
         # Start new input thread ONLY if one isn't already running
         if not _input_thread or not _input_thread.is_alive():
+            print(f"DEBUG: Starting new input thread (timeout={timeout})")
             _input_thread = threading.Thread(target=keyboard_input_thread, daemon=True)
             _input_thread.start()
+        else:
+            print(f"DEBUG: Reusing existing input thread (alive={_input_thread.is_alive()})")
     
     # Wait for input with optional timeout
     if timeout is not None:
         # With timeout - return None if timeout expires
+        print(f"DEBUG: Waiting for input with {timeout}s timeout...")
         if input_ready.wait(timeout=timeout):
+            print(f"DEBUG: Got input: {keyboard_input}")
             return keyboard_input
         else:
+            print(f"DEBUG: Timeout expired, no input")
             return None
     else:
         # Without timeout - wait indefinitely with hook checks
+        print(f"DEBUG: Waiting for input indefinitely...")
         while True:
             if input_ready.wait(timeout=0.1):
+                print(f"DEBUG: Got input: {keyboard_input}")
                 return keyboard_input
             # Check if phone has been hung up
             if GPIO_AVAILABLE:
                 if GPIO.input(SWITCH_PIN) == GPIO.HIGH:
+                    print(f"DEBUG: Phone hung up")
                     return None
 
 def wait_for_keypress():
