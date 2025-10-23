@@ -72,7 +72,12 @@ class Scene:
                     return best_match, None
                 elif "default" in connection:
                     print(f"DEBUG: No items match, using default: {connection['default']}")
-                    return connection["default"], None
+                    # Make sure we return a string, not a dict
+                    if isinstance(connection["default"], str):
+                        return connection["default"], None
+                    else:
+                        print(f"WARNING: Invalid default connection type: {type(connection['default'])}")
+                        return None, "Invalid scene transition"
                 else:
                     # No match and no default
                     if choice == "timeout":
@@ -82,7 +87,12 @@ class Scene:
             else:
                 # Regular hidden connection (simple string)
                 print(f"DEBUG: Hidden connection '{choice}' -> '{connection}'")
-                return connection, None
+                # Make sure we return a string, not a dict
+                if isinstance(connection, str):
+                    return connection, None
+                else:
+                    print(f"WARNING: Invalid connection type: {type(connection)}")
+                    return None, "Invalid scene transition"
 
         # Check if it's a regular numbered choice (1-9, 0, etc.)
         try:
@@ -246,10 +256,15 @@ def handle_timed_input(scene, scene_audio):
     while time.time() - start_time < timeout_seconds:
         remaining = timeout_seconds - (time.time() - start_time)
         # Check for keypress with 0.1s timeout so we can exit the loop on timeout
-        choice = keypad.wait_for_single_keypress(timeout=0.1)
-        if choice:
-            print(f"DEBUG: Got choice before timeout: {choice}")
-            return choice
+        try:
+            choice = keypad.wait_for_single_keypress(timeout=0.1)
+            if choice:
+                # If we get a keypress during timeout, ignore it and just timeout
+                print(f"DEBUG: Ignoring keypress during timeout: {choice}")
+                continue
+        except Exception as e:
+            print(f"DEBUG: Error during keypress check: {e}")
+            continue
     
     print(f"DEBUG: Timeout reached after {timeout_seconds}s, returning 'timeout'")
     return "timeout"
