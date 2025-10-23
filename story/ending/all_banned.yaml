@@ -6,4 +6,4 @@ hidden_connections:
   default: "plotdevice"
 timeout_after_audio: true
 items_granted: []
-items_required: []
+items_required: ["451book","animalfarmbook","lotrbook","wildthingsbook"]
