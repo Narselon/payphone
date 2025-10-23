@@ -231,7 +231,7 @@ def handle_timed_input(scene, scene_audio):
         else:
             if start_time is None:
                 print("DEBUG: Audio finished")
-                start_time = time.Time()
+                start_time = time.time()
             elif time.time() - start_time >= timeout_seconds:
                 print(f"DEBUG: Timeout reached after {timeout_seconds}s, returning 'timeout'")
                 result = "timeout"
