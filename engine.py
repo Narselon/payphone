@@ -3,11 +3,24 @@ import yaml
 import keypad
 import time
 from scene_audio import SceneAudio  # Import the new SceneAudio class
-from payphone import payphone  # Import the payphone module
+
+# Try to import payphone, but handle errors gracefully
+try:
+    from payphone import payphone
+    print("Payphone initialized successfully")
+except Exception as e:
+    print(f"Error initializing payphone: {e}")
+    import traceback
+    traceback.print_exc()
+    # Create a dummy payphone object if initialization fails
+    class DummyPayphone:
+        def start_adventure(self): pass
+        def stop_adventure(self): pass
+    payphone = DummyPayphone()
 
 class Scene:
     def __init__(self, id, text, connections, hidden_connections=None, items_granted=None, 
-                 items_required=None, timeout_after_audio=False):
+                 items_required=None, timeout_after_audio=False, timeout_seconds=3):
         self.id = id
         self.text = text
         self.connections = connections
@@ -15,6 +28,7 @@ class Scene:
         self.items_granted = items_granted if items_granted else []
         self.items_required = items_required if items_required else []
         self.timeout_after_audio = timeout_after_audio  # New flag
+        self.timeout_seconds = timeout_seconds  # Configurable timeout duration (default 3 seconds)
 
     def display(self, inventory):
         print("-" * 50)  
@@ -29,7 +43,7 @@ class Scene:
         Determine the next scene based on choice and inventory items.
         Supports multiple branching paths based on specific items.
         """
-        # Check if the choice is a special hidden connection
+        # Check if the choice is a special hidden connection (timeout, codes, etc.)
         if choice in self.hidden_connections:
             connection = self.hidden_connections[choice]
             
@@ -47,14 +61,17 @@ class Scene:
                             best_count = len(required_items)
                 
                 if best_match:
+                    print(f"DEBUG: Timeout with items, going to: {best_match}")
                     return best_match, None
                 else:
                     # No required items, stay in scene
                     return None, "You need the right items to progress..."
             else:
+                # Regular hidden connection (simple string or timeout without items)
+                print(f"DEBUG: Hidden connection '{choice}' -> '{connection}'")
                 return connection, None
 
-        # Check if it's a regular numbered choice
+        # Check if it's a regular numbered choice (1-9, 0, etc.)
         try:
             choice_index = int(choice)
             if choice_index in self.connections:
@@ -95,8 +112,18 @@ class Scene:
                         return paths["default"], None
                     else:
                         return None, "You don't have the right item for this action."
+            else:
+                # Choice is a number but not in connections
+                # Check if there's a default for any button press
+                if "default" in self.hidden_connections:
+                    return self.hidden_connections["default"], None
+                    
         except ValueError:
-            pass  # Ignore non-integer choices (except for hidden ones)
+            # Not a single digit - could be a multi-digit code that wasn't in hidden_connections
+            # Check if there's a "wrong_code" connection for invalid codes
+            if "wrong_code" in self.hidden_connections:
+                return self.hidden_connections["wrong_code"], None
+            pass  # Ignore non-integer choices
             
         return None, "Invalid choice. Try again."
 
@@ -163,7 +190,8 @@ def load_scenes():
                     hidden_connections=data.get("hidden_connections", {}),
                     items_granted=data.get("items_granted", []),
                     items_required=data.get("items_required", []),
-                    timeout_after_audio=data.get("timeout_after_audio", False)
+                    timeout_after_audio=data.get("timeout_after_audio", False),
+                    timeout_seconds=data.get("timeout_seconds", 3)
                 )
                 print(f"Loaded scene: {data['id']} from {filepath}")
         except Exception as e:
@@ -186,19 +214,31 @@ def load_scenes():
     return scenes
 
 
-def handle_timed_input(scene, scene_audio, timeout_seconds=3):
+def handle_timed_input(scene, scene_audio):
     """Handle timed input for a scene"""
+    timeout_seconds = scene.timeout_seconds  # Use scene's configured timeout
+    
+    print(f"DEBUG: handle_timed_input called with timeout_seconds={timeout_seconds}")
+    print(f"DEBUG: timeout_after_audio={scene.timeout_after_audio}")
+    
     if scene.timeout_after_audio:
+        print("DEBUG: Waiting for audio to finish...")
         # Wait for audio to finish
         while scene_audio.is_playing():
             time.sleep(0.1)
+        print("DEBUG: Audio finished")
     
+    print(f"DEBUG: Starting {timeout_seconds}s timeout, waiting for keypress...")
     start_time = time.time()
     while time.time() - start_time < timeout_seconds:
-        choice = keypad.wait_for_single_keypress()
+        remaining = timeout_seconds - (time.time() - start_time)
+        # Check for keypress with 0.1s timeout so we can exit the loop on timeout
+        choice = keypad.wait_for_single_keypress(timeout=0.1)
         if choice:
+            print(f"DEBUG: Got choice before timeout: {choice}")
             return choice
-            
+    
+    print(f"DEBUG: Timeout reached after {timeout_seconds}s, returning 'timeout'")
     return "timeout"
 
 
@@ -275,24 +315,32 @@ def main():
                     # Simple timeout connection
                     should_use_timeout = True
 
+            # Check for disable_star_hash flag
+            disable_star_hash = getattr(scene, "disable_star_hash", False)
+
             # Get player input with timeout if appropriate
             if should_use_timeout:
                 choice = handle_timed_input(scene, scene_audio)
             else:
                 choice = keypad.wait_for_keypress()
-            
+
             # If the hook state changed (phone hung up), break the game loop
             if not keypad.is_phone_lifted() or choice is None:
                 print("Phone hung up. Game reset.")
                 scene_audio.stop_audio()  # Stop any playing audio
                 break
-            
+
             # Check for hang-up command
             if choice == 'h' or choice == 'H':
                 print("Phone hung up. Resetting game...")
                 scene_audio.stop_audio()  # Stop any playing audio
                 break
-                
+
+            # Disable * and # if flag is set
+            if disable_star_hash and choice in ("*", "#"):
+                print("This action is disabled in this scene.")
+                continue
+
             # Handle special command for replaying scene audio
             if choice == "#":
                 print("\nReplaying scene audio...")
@@ -312,7 +360,6 @@ def main():
                     if item not in inventory:
                         inventory.add(item)
                         print(f"You obtained: {item}!")
-                
                 # If scene changes, play the new scene audio
                 if next_scene != current_scene:
                     scene_audio.stop_audio()  # Stop current audio before changing scenes

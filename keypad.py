@@ -87,7 +87,8 @@ input_ready = threading.Event()
 phone_on_hook = True  # Track the state of the phone hook
 hook_state_changed = threading.Event()
 last_keypress_time = 0  # Track the time of the last keypress
-KEYPRESS_DELAY = 0.5  # Delay between keypresses in seconds
+last_key_pressed = None  # Track the last key pressed
+KEYPRESS_DELAY = 0.3  # Delay between keypresses in seconds (increased debounce)
 
 # Multi-digit input variables
 input_buffer = ""
@@ -143,9 +144,10 @@ def is_phone_lifted():
     return not phone_on_hook
 
 def keyboard_input_thread():
-    """Thread function to handle keyboard input."""
-    global keyboard_input, _should_stop, last_keypress_time
+    """Thread function to handle keyboard input. Runs continuously."""
+    global keyboard_input, _should_stop, last_keypress_time, last_key_pressed
     
+    print("DEBUG: Input thread started")
     try:
         while not _should_stop:
             current_time = time.time()
@@ -154,22 +156,34 @@ def keyboard_input_thread():
             if GPIO_AVAILABLE:
                 # Check each column
                 for col_num, col_pin in enumerate(COLS):
+                    if _should_stop:
+                        print("DEBUG: Thread stopping (should_stop=True)")
+                        return
+                        
                     GPIO.output(col_pin, GPIO.LOW)  # Set column low
                     time.sleep(0.01)  # Add delay for GPIO to settle
                     
                     # Check each row
                     for row_num, row_pin in enumerate(ROWS):
+                        if _should_stop:
+                            GPIO.output(col_pin, GPIO.HIGH)
+                            print("DEBUG: Thread stopping (should_stop=True)")
+                            return
+                            
                         if GPIO.input(row_pin) == GPIO.LOW:  # Key pressed
-                            # Debounce check
-                            if current_time - last_keypress_time < KEYPRESS_DELAY:
+                            key = KEYPAD_MAPPING[row_num][col_num]
+                            
+                            # Debounce check - ignore if same key pressed too quickly
+                            if key == last_key_pressed and current_time - last_keypress_time < KEYPRESS_DELAY:
                                 GPIO.output(col_pin, GPIO.HIGH)
                                 continue
                                 
-                            keyboard_input = KEYPAD_MAPPING[row_num][col_num]
+                            keyboard_input = key
                             print(f"Keypad press detected: {keyboard_input}")
                             play_keypad_sound(keyboard_input)
                             input_ready.set()
                             last_keypress_time = current_time
+                            last_key_pressed = key
                             
                             # Wait for key release
                             while GPIO.input(row_pin) == GPIO.LOW:
@@ -177,7 +191,9 @@ def keyboard_input_thread():
                             
                             GPIO.output(col_pin, GPIO.HIGH)
                             time.sleep(0.2)  # Delay after key release
-                            continue  # Return after handling keypress instead of continue
+                            
+                            # DON'T return - keep thread running for next keypress
+                            break  # Break inner loop to restart column scan
                             
                     GPIO.output(col_pin, GPIO.HIGH)
                 time.sleep(0.01)
@@ -189,31 +205,60 @@ def keyboard_input_thread():
                     if keyboard_input in KEYPAD_SOUNDS:
                         play_keypad_sound(keyboard_input)
                     input_ready.set()
-                    break
+                    # Don't break - wait for next input
                     
     except (EOFError, KeyboardInterrupt):
         _should_stop = True
+    
+    print("DEBUG: Input thread exiting")
 
 # Add these new functions
 
-def wait_for_single_keypress():
-    """Wait for a single keypress and return it."""
-    global keyboard_input, input_ready, _input_thread
+def wait_for_single_keypress(timeout=None):
+    """Wait for a single keypress and return it, with optional timeout."""
+    global keyboard_input, input_ready, _input_thread, _should_stop
     
     with _input_thread_lock:
-        # Reset states
-        keyboard_input = None
-        input_ready.clear()
-        
-        # Start new input thread if needed
+        # Only start a new thread if the current one is dead
         if not _input_thread or not _input_thread.is_alive():
-            _input_thread = threading.Thread(target=keyboard_input_thread)
-            _input_thread.daemon = True
+            print(f"DEBUG: Starting new input thread (timeout={timeout})")
+            # Reset states only when starting new thread
+            keyboard_input = None
+            input_ready.clear()
+            _should_stop = False
+            _input_thread = threading.Thread(target=keyboard_input_thread, daemon=True)
             _input_thread.start()
+        else:
+            print(f"DEBUG: Thread already running, waiting for input (timeout={timeout})")
     
-    # Wait for input
-    input_ready.wait()
-    return keyboard_input
+    # Wait for input with optional timeout
+    if timeout is not None:
+        # With timeout - return None if timeout expires
+        print(f"DEBUG: Waiting for input with {timeout}s timeout...")
+        if input_ready.wait(timeout=timeout):
+            result = keyboard_input
+            print(f"DEBUG: Got input: {result}")
+            # Clear the event for next use
+            input_ready.clear()
+            return result
+        else:
+            print(f"DEBUG: Timeout expired, no input")
+            return None
+    else:
+        # Without timeout - wait indefinitely with hook checks
+        print(f"DEBUG: Waiting for input indefinitely...")
+        while True:
+            if input_ready.wait(timeout=0.1):
+                result = keyboard_input
+                print(f"DEBUG: Got input: {result}")
+                # Clear the event for next use
+                input_ready.clear()
+                return result
+            # Check if phone has been hung up
+            if GPIO_AVAILABLE:
+                if GPIO.input(SWITCH_PIN) == GPIO.HIGH:
+                    print(f"DEBUG: Phone hung up")
+                    return None
 
 def wait_for_keypress():
     """Wait for keypress and handle special inputs."""
@@ -233,19 +278,24 @@ def wait_for_keypress():
                 CODE_ENTRY_MODE = False
                 code = input_buffer
                 input_buffer = ""
+                print(f"Code entry complete: {code}")
                 return code
             elif key == '*':
                 # Cancel code entry
+                print("Code entry cancelled")
                 CODE_ENTRY_MODE = False
                 input_buffer = ""
                 continue
             else:
                 # Add to code buffer
                 input_buffer += key
+                print(f"Code buffer: {input_buffer}")
                 continue
                 
+        # Not in code entry mode
         # Start code entry mode
         if key == '*':
+            print("Starting code entry mode")
             CODE_ENTRY_MODE = True
             input_buffer = ""
             continue
