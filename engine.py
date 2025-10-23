@@ -20,7 +20,7 @@ except Exception as e:
 
 class Scene:
     def __init__(self, id, text, connections, hidden_connections=None, items_granted=None, 
-                 items_required=None, timeout_after_audio=False, timeout_seconds=3):
+                 items_required=None, timeout_after_audio=False, timeout_seconds=3, disable_star_hash=False):
         self.id = id
         self.text = text
         self.connections = connections
@@ -29,6 +29,7 @@ class Scene:
         self.items_required = items_required if items_required else []
         self.timeout_after_audio = timeout_after_audio  # New flag
         self.timeout_seconds = timeout_seconds  # Configurable timeout duration (default 3 seconds)
+        self.disable_star_hash = disable_star_hash  # Flag to disable * and # special functions
 
     def display(self, inventory):
         print("-" * 50)  
@@ -47,27 +48,39 @@ class Scene:
         if choice in self.hidden_connections:
             connection = self.hidden_connections[choice]
             
-            # Handle timeout with item-based branching
-            if choice == "timeout" and isinstance(connection, dict):
+            # Handle timeout or default with item-based branching
+            if isinstance(connection, dict):
+                print(f"DEBUG: Item-based branching for '{choice}', checking inventory: {list(inventory)}")
                 # Find the best match (most items required that player has)
                 best_match = None
                 best_count = 0
                 
                 for item_list_str, target_scene in connection.items():
+                    if item_list_str == "default":
+                        # Save default for later
+                        continue
                     required_items = [item.strip() for item in item_list_str.split(',')]
+                    print(f"DEBUG: Checking if player has: {required_items}")
                     if all(item in inventory for item in required_items):
                         if len(required_items) > best_count:
                             best_match = target_scene
                             best_count = len(required_items)
+                            print(f"DEBUG: New best match with {best_count} items -> {target_scene}")
                 
                 if best_match:
-                    print(f"DEBUG: Timeout with items, going to: {best_match}")
+                    print(f"DEBUG: Using best match: {best_match}")
                     return best_match, None
+                elif "default" in connection:
+                    print(f"DEBUG: No items match, using default: {connection['default']}")
+                    return connection["default"], None
                 else:
-                    # No required items, stay in scene
-                    return None, "You need the right items to progress..."
+                    # No match and no default
+                    if choice == "timeout":
+                        return None, "You need the right items to progress..."
+                    else:
+                        return None, "You don't have the right items."
             else:
-                # Regular hidden connection (simple string or timeout without items)
+                # Regular hidden connection (simple string)
                 print(f"DEBUG: Hidden connection '{choice}' -> '{connection}'")
                 return connection, None
 
@@ -221,29 +234,25 @@ def handle_timed_input(scene, scene_audio):
     print(f"DEBUG: handle_timed_input called with timeout_seconds={timeout_seconds}")
     print(f"DEBUG: timeout_after_audio={scene.timeout_after_audio}")
     
+    if scene.timeout_after_audio:
+        print("DEBUG: Waiting for audio to finish...")
+        # Wait for audio to finish
+        while scene_audio.is_playing():
+            time.sleep(0.1)
+        print("DEBUG: Audio finished")
+    
     print(f"DEBUG: Starting {timeout_seconds}s timeout, waiting for keypress...")
-    start_time = None
-    while True:
-        
-        if scene_audio.is_playing():
-            print("DEBUG: Waiting for audio to finish...")
-            start_time = None
-        else:
-            if start_time is None:
-                print("DEBUG: Audio finished")
-                start_time = time.time()
-            elif time.time() - start_time >= timeout_seconds:
-                print(f"DEBUG: Timeout reached after {timeout_seconds}s, returning 'timeout'")
-                result = "timeout"
-                break
-
-        key = keypad.wait_for_single_keypress(timeout=0.1)
-        if key is not None:
-            print(f"DEBUG: Got choice before timeout: {key}")
-            result = key
-            break
-
-    return result
+    start_time = time.time()
+    while time.time() - start_time < timeout_seconds:
+        remaining = timeout_seconds - (time.time() - start_time)
+        # Check for keypress with 0.1s timeout so we can exit the loop on timeout
+        choice = keypad.wait_for_single_keypress(timeout=0.1)
+        if choice:
+            print(f"DEBUG: Got choice before timeout: {choice}")
+            return choice
+    
+    print(f"DEBUG: Timeout reached after {timeout_seconds}s, returning 'timeout'")
+    return "timeout"
 
 
 def main():
@@ -319,32 +328,24 @@ def main():
                     # Simple timeout connection
                     should_use_timeout = True
 
-            # Check for disable_star_hash flag
-            disable_star_hash = getattr(scene, "disable_star_hash", False)
-
             # Get player input with timeout if appropriate
             if should_use_timeout:
                 choice = handle_timed_input(scene, scene_audio)
             else:
                 choice = keypad.wait_for_keypress()
-
+            
             # If the hook state changed (phone hung up), break the game loop
             if not keypad.is_phone_lifted() or choice is None:
                 print("Phone hung up. Game reset.")
                 scene_audio.stop_audio()  # Stop any playing audio
                 break
-
+            
             # Check for hang-up command
             if choice == 'h' or choice == 'H':
                 print("Phone hung up. Resetting game...")
                 scene_audio.stop_audio()  # Stop any playing audio
                 break
-
-            # Disable * and # if flag is set
-            if disable_star_hash and choice in ("*", "#"):
-                print("This action is disabled in this scene.")
-                continue
-
+                
             # Handle special command for replaying scene audio
             if choice == "#":
                 print("\nReplaying scene audio...")
@@ -364,6 +365,7 @@ def main():
                     if item not in inventory:
                         inventory.add(item)
                         print(f"You obtained: {item}!")
+                
                 # If scene changes, play the new scene audio
                 if next_scene != current_scene:
                     scene_audio.stop_audio()  # Stop current audio before changing scenes
