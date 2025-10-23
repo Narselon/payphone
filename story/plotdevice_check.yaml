@@ -1,11 +1,11 @@
 id: "plotdevice_check"
-text: ""
+text: "Checking code..."  # Added some text so we know we're in this scene
 connections: {}
 hidden_connections:
-  "timeout":
-    "sand": "plotdevice_sand"
-    "default": "plotdevice"
+  timeout:
+    sand: "plotdevice_sand"
+    default: "plotdevice"
 items_granted: []
 items_required: []
 timeout_after_audio: true
-timeout_seconds: 0.1  # Small delay but enough to trigger timeout
+timeout_seconds: 1  # Increased slightly to ensure it triggers

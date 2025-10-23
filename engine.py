@@ -313,20 +313,31 @@ def main():
             # Display the scene with options
             scene.display(inventory)
             
-            # Check if timeout should be used (only if player has required items for timeout)
+            # Check if timeout should be used
             should_use_timeout = False
             if "timeout" in scene.hidden_connections:
                 timeout_connection = scene.hidden_connections["timeout"]
                 if isinstance(timeout_connection, dict):
-                    # Check if player has any of the required item combinations
-                    for item_list_str, target_scene in timeout_connection.items():
-                        required_items = [item.strip() for item in item_list_str.split(',')]
-                        if all(item in inventory for item in required_items):
-                            should_use_timeout = True
-                            break
+                    print(f"DEBUG: Checking timeout conditions with items: {list(inventory)}")
+                    # For non-empty inventory, check if any items match
+                    if inventory:
+                        for item_list_str, target_scene in timeout_connection.items():
+                            if item_list_str == "default":
+                                continue
+                            required_items = [item.strip() for item in item_list_str.split(',')]
+                            print(f"DEBUG: Checking timeout requirements: {required_items}")
+                            if all(item in inventory for item in required_items):
+                                should_use_timeout = True
+                                print("DEBUG: Timeout conditions met with items")
+                                break
+                    # If no item matches found, but there's a default, enable timeout
+                    if not should_use_timeout and "default" in timeout_connection:
+                        should_use_timeout = True
+                        print("DEBUG: Using default timeout path")
                 else:
-                    # Simple timeout connection
+                    # Simple timeout connection (string)
                     should_use_timeout = True
+                    print("DEBUG: Using simple timeout")
 
             # Get player input with timeout if appropriate
             if should_use_timeout:
