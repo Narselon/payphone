@@ -371,16 +371,16 @@ def main():
             # Store previous scene for backtracking
             previous_scene = current_scene
 
-            # Get next scene based on user choice
+            # Grant any items from the current scene BEFORE checking next scene
+            for item in scene.items_granted:
+                if item not in inventory:
+                    inventory.add(item)
+                    print(f"You obtained: {item}!")
+
+            # Get next scene based on user choice (now with updated inventory)
             next_scene, message = scene.get_next_scene(choice, inventory)
 
             if next_scene:
-                # Grant any items from the current scene before moving on
-                for item in scene.items_granted:
-                    if item not in inventory:
-                        inventory.add(item)
-                        print(f"You obtained: {item}!")
-                
                 # If scene changes, play the new scene audio
                 if next_scene != current_scene:
                     scene_audio.stop_audio()  # Stop current audio before changing scenes

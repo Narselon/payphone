@@ -2,8 +2,11 @@ id: "all_banned"
 text: "all banned"
 connections: {}
 hidden_connections:
-  timeout: "plotdevice"
-  default: "plotdevice"
+  timeout:
+    default: "plotdevice"  # Always transition to plotdevice
+  default:
+    default: "plotdevice"
 timeout_after_audio: true
+timeout_seconds: 1  # Short timeout to transition quickly
 items_granted: []
-items_required: ["451book","animalfarmbook","lotrbook","wildthingsbook"]
+items_required: ["animalfarmbook","451book","lotrbook","wildthingsbook"]
