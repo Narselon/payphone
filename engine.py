@@ -352,6 +352,10 @@ def main():
                 scene_audio.stop_audio()  # Stop any currently playing audio
                 scene_audio.play_scene_audio(current_scene)  # Replay the scene audio
                 continue  # Return to scene options
+            
+            # Stop audio when entering code mode
+            if choice == "*":
+                scene_audio.stop_audio()  # Stop any currently playing audio
 
             # Store previous scene for backtracking
             previous_scene = current_scene

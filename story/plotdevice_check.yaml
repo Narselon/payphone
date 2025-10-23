@@ -2,13 +2,10 @@ id: "plotdevice_check"
 text: ""
 connections: {}
 hidden_connections:
-  timeout:
-    sand: "plotdevice_sand"
-    default: "plotdevice"
-  default:
-    sand: "plotdevice_sand"
-    default: "plotdevice"
+  "timeout":
+    "sand": "plotdevice_sand"
+    "default": "plotdevice"
 items_granted: []
 items_required: []
-timeout_after_audio: false
-timeout_seconds: 0  # Instant transition
+timeout_after_audio: true
+timeout_seconds: 0.1  # Small delay but enough to trigger timeout
