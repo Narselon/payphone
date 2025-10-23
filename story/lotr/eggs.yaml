@@ -3,7 +3,7 @@ text: "is it book"
 connections: {}
 hidden_connections:
   "0": "hub"
-  "wrong_code": "wrong"
+  "default": "wrong"
   "2665": "book"
 items_granted: []
 items_required: []

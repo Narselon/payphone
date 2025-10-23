@@ -221,25 +221,29 @@ def handle_timed_input(scene, scene_audio):
     print(f"DEBUG: handle_timed_input called with timeout_seconds={timeout_seconds}")
     print(f"DEBUG: timeout_after_audio={scene.timeout_after_audio}")
     
-    if scene.timeout_after_audio:
-        print("DEBUG: Waiting for audio to finish...")
-        # Wait for audio to finish
-        while scene_audio.is_playing():
-            time.sleep(0.1)
-        print("DEBUG: Audio finished")
-    
     print(f"DEBUG: Starting {timeout_seconds}s timeout, waiting for keypress...")
-    start_time = time.time()
-    while time.time() - start_time < timeout_seconds:
-        remaining = timeout_seconds - (time.time() - start_time)
-        # Check for keypress with 0.1s timeout so we can exit the loop on timeout
-        choice = keypad.wait_for_single_keypress(timeout=0.1)
-        if choice:
-            print(f"DEBUG: Got choice before timeout: {choice}")
-            return choice
-    
-    print(f"DEBUG: Timeout reached after {timeout_seconds}s, returning 'timeout'")
-    return "timeout"
+    start_time = None
+    while True:
+        
+        if scene_audio.is_playing():
+            print("DEBUG: Waiting for audio to finish...")
+            start_time = None
+        else:
+            if start_time is None:
+                print("DEBUG: Audio finished")
+                start_time = time.Time()
+            elif time.time() - start_time >= timeout_seconds:
+                print(f"DEBUG: Timeout reached after {timeout_seconds}s, returning 'timeout'")
+                result = "timeout"
+                break
+
+        key = keypad.wait_for_single_keypress(timeout=0.1)
+        if key is not None:
+            print(f"DEBUG: Got choice before timeout: {key}")
+            result = key
+            break
+
+    return result
 
 
 def main():
