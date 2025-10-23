@@ -1,9 +1,8 @@
 id: "jump"
 text: "tom or press home"
 connections: 
-  2: ["follow_tom", "follow_tom", []]
-  8: ["press_home", "press_home", []]
-  9: ["press_home", "press_home", []]
+  9: ["follow_tom", "follow_tom", []]
+  5: ["press_home", "press_home", []]
 hidden_connections:
   "0": "hub"
 items_granted: []
