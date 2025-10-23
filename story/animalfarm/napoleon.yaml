@@ -8,4 +8,4 @@ hidden_connections:
 items_granted: []
 items_required: []
 timeout_after_audio: true
-timeout_seconds: 10
+timeout_seconds: 6
